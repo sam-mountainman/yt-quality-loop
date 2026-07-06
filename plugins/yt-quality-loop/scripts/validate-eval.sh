@@ -47,6 +47,10 @@ if ! [[ "$THRESHOLD" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
+# 行リスト membership はパイプを使わない (set -o pipefail 下の `printf | grep -q` は
+# grep の先行終了で printf が SIGPIPE になり確率的に偽になる — 実測済みのフレーク源)
+in_lines() { case "$(printf '\n%s\n' "$1")" in *"$(printf '\n%s\n' "$2")"*) return 0;; *) return 1;; esac; }
+
 ERRORS=()
 
 # 2. score は 0-100 の整数
@@ -91,13 +95,13 @@ if [ -n "$REQUIRED_KEYS" ]; then
   ACTUAL_KEYS=$(jq -r '(.quality.breakdown // {}) | keys_unsorted | join("\n")' "$EVAL_FILE" 2>/dev/null || echo "")
   while IFS= read -r k; do
     [ -n "$k" ] || continue
-    if ! printf '%s\n' "$ACTUAL_KEYS" | grep -qxF "$k"; then
+    if ! in_lines "$ACTUAL_KEYS" "$k"; then
       ERRORS+=("breakdown is missing required key: '$k'")
     fi
   done <<< "$REQUIRED_KEYS"
   while IFS= read -r k; do
     [ -n "$k" ] || continue
-    if ! printf '%s\n' "$REQUIRED_KEYS" | grep -qxF "$k"; then
+    if ! in_lines "$REQUIRED_KEYS" "$k"; then
       ERRORS+=("breakdown has an extra key not in the contract: '$k' (new findings go to feedback, not breakdown)")
     fi
   done <<< "$ACTUAL_KEYS"

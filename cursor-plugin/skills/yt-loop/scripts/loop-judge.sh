@@ -22,6 +22,10 @@ fi
 STATE="$RUN_DIR/state.json"
 EVAL_FILE="$RUN_DIR/turn-$NNN-eval.json"
 
+# 行リスト membership はパイプを使わない (set -o pipefail 下の `printf | grep -q` は
+# grep の先行終了で printf が SIGPIPE になり確率的に偽になる)
+in_lines() { case "$(printf '\n%s\n' "$1")" in *"$(printf '\n%s\n' "$2")"*) return 0;; *) return 1;; esac; }
+
 [ -f "$STATE" ] || { echo "INVALID: state not found: $STATE"; exit 1; }
 
 best_line() {
@@ -93,14 +97,14 @@ if [ -n "$CRITERIA" ]; then
   ACT=$(jq -r '(.quality.breakdown // {}) | keys_unsorted | join("\n")' "$EVAL_FILE" 2>/dev/null || echo "")
   while IFS= read -r k; do
     [ -n "$k" ] || continue
-    if ! printf '%s\n' "$ACT" | grep -qxF "$k"; then
+    if ! in_lines "$ACT" "$k"; then
       echo "INVALID: breakdown is missing required key: '$k'"
       exit 1
     fi
   done <<< "$REQ"
   while IFS= read -r k; do
     [ -n "$k" ] || continue
-    if ! printf '%s\n' "$REQ" | grep -qxF "$k"; then
+    if ! in_lines "$REQ" "$k"; then
       echo "INVALID: breakdown has an extra key not in criteria: '$k'"
       exit 1
     fi

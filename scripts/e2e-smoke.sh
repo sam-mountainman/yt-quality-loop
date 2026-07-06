@@ -83,3 +83,6 @@ printf '{"cwd":"%s","session_id":"%s","hook_event_name":"UserPromptSubmit"}' "$T
 grep -q "YT_LOOP_SESSION_ID=$SID" "$PROMPT_OUT"
 
 echo "e2e-smoke: ok"
+
+echo "== guard tests (goodhart対策の挙動) =="
+bash "$ROOT/scripts/guard-tests.sh"
