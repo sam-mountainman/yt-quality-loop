@@ -78,4 +78,15 @@ if [ -d "$HOOK_SCRIPT_SRC" ]; then
   echo "synced -> codex-plugin/scripts"
 fi
 
+ASSET_SRC="$ROOT/assets"
+if [ -d "$ASSET_SRC" ]; then
+  for pkg in codex-plugin cursor-plugin antigravity-plugin plugins/yt-quality-loop; do
+    DEST="$ROOT/$pkg/assets"
+    rm -rf "$DEST"
+    mkdir -p "$DEST"
+    cp -R "$ASSET_SRC"/. "$DEST"/
+    echo "synced -> $pkg/assets"
+  done
+fi
+
 echo "done."

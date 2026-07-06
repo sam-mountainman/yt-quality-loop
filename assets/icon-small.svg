@@ -1,0 +1,25 @@
+<!--
+YT Quality Loop composer icon.
+Play glyph adapted from Tabler Icons "player-play-filled" (MIT).
+Source: https://github.com/tabler/tabler-icons/blob/main/icons/filled/player-play.svg
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="YT Quality Loop">
+  <defs>
+    <linearGradient id="bg" x1="16" y1="8" x2="112" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#18181b"/>
+      <stop offset="1" stop-color="#240505"/>
+    </linearGradient>
+    <linearGradient id="red" x1="28" y1="35" x2="100" y2="94" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff3b30"/>
+      <stop offset="0.55" stop-color="#ff0033"/>
+      <stop offset="1" stop-color="#b80018"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="30" fill="url(#bg)"/>
+  <path d="M37 35h54c14 0 22 8 22 22v14c0 14-8 22-22 22H37c-14 0-22-8-22-22V57c0-14 8-22 22-22z" fill="url(#red)"/>
+  <path d="M56 47v34c0 4 4 6 7 4l27-17c3-2 3-6 0-8L63 43c-3-2-7 0-7 4z" fill="#ffffff"/>
+  <path d="M33 26c9-7 20-11 32-11 17 0 32 8 42 21" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+  <path d="M101 23l9 16-19-1" fill="#ffffff" opacity="0.9"/>
+  <path d="M95 102c-9 7-20 11-32 11-17 0-32-8-42-21" fill="none" stroke="#ff3b30" stroke-width="5" stroke-linecap="round" opacity="0.95"/>
+  <path d="M27 105l-9-16 19 1" fill="#ff3b30" opacity="0.95"/>
+</svg>

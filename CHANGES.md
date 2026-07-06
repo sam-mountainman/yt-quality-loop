@@ -20,6 +20,13 @@
 - AGENTS.md に「他エージェント仕様は AI の記憶で断言しない。公式 docs とプローブ結果を残す」ルールを追加
 - `docs/e2e-checklist.md` と README から、互換性表とプローブを配布前チェックに接続
 
+## v1.6.2 の追加 (プラグインアイコン)
+
+- `assets/icon.svg` / `assets/icon-small.svg` を追加。Tabler Icons `player-play-filled` (MIT) をベースに、YouTube 風の赤い再生ボタン + 品質ループを示すリングとしてデザイン
+- Codex plugin の `interface.logo` / `interface.composerIcon` / `brandColor` を設定
+- Cursor plugin は `logo`、Antigravity plugin は `icon` で同梱アイコンを参照
+- `assets/NOTICE.md` に素材ソースとライセンスを明記
+
 ## v1.2 の修正 (Claude Code 前提からの脱却)
 
 **誤っていた前提の修正:**

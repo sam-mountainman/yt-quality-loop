@@ -53,6 +53,26 @@ for (const [file, base] of checks) {
       }
     }
   }
+  for (const [label, value] of [
+    ['icon', json.icon],
+    ['logo', json.logo],
+    ['interface.logo', json.interface && json.interface.logo],
+    ['interface.logoDark', json.interface && json.interface.logoDark],
+    ['interface.composerIcon', json.interface && json.interface.composerIcon],
+  ]) {
+    if (!value) continue;
+    if (typeof value !== 'string') {
+      throw new Error(`${file}: ${label} must be a string path`);
+    }
+    const normalized = value.startsWith('./') ? value.slice(2) : value;
+    if (normalized.startsWith('/') || normalized.includes('..')) {
+      throw new Error(`${file}: ${label} must stay inside plugin root: ${value}`);
+    }
+    const target = `${base}/${normalized}`;
+    if (!fs.existsSync(target)) {
+      throw new Error(`${file}: ${label} target missing: ${target}`);
+    }
+  }
 }
 
 for (const file of [
