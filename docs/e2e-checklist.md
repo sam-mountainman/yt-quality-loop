@@ -75,3 +75,9 @@ Cursor CLI には、この repo の plugin marketplace を headless validate す
 - `$yt-loop-hook` を `codex exec` で実走: hook 未発火 (plugin hook / repo hook とも、`--dangerously-bypass-hook-trust` 付きでも) → **スキルが検知して `$yt-loop` に自動フォールバックし、納品まで完走** (85点・自己採点開示付き・動画ブリーフ自動生成)。exec モードで hook は発火しない模様
 - 対話モードの hook 発火: 未検証 (tmux 無し環境)。対話 Codex で `YT_LOOP_SESSION_ID` 注入の有無を確認すること
 - 公式 docs 確認済み: PLUGIN_ROOT / CLAUDE_PLUGIN_ROOT が plugin hook に渡る、イベント名 PascalCase、decision:block 継続 — 実装は仕様適合
+
+## 実測記録・追補 (2026-07-06, hook発火条件)
+
+- `codex exec` / 対話TUI (CLI 0.132.0, `--dangerously-bypass-hook-trust` 付き) の両方で、plugin hook・repo hook (`.codex/hooks.json`) とも**発火せず** (dump hook による実測)。プラグインの UserPromptSubmit 注入もコンテキストに届かない (モデルに引用させて NONE を確認)
+- bypass 無しの対話承認フローは未検証 — Codex Desktop アプリが `~/.codex/state_5.sqlite` をロックしており CLI 対話を並走できなかった (Desktop 常用環境では CLI 対話の同時起動不可の点も配布時の注意)
+- ユーザー環境の `[hooks.state]` に trusted_hash 実績があるため、hook 自体はどこかの面 (Desktop/承認フロー) で機能する。`$yt-loop-hook` は plugin root 不在を検知して `$yt-loop` へ安全にフォールバックするため、発火しない環境でも実害なし (実測済み)
