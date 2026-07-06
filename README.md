@@ -179,6 +179,19 @@ claude plugin install yt-quality-loop@yt-quality-loop --scope project
 
 移植メモは `.yt-loop/imported-generators/` に保存され、`generator:` に指定する名前、プロファイルへ移すべきルール、除外すべき危険指示が分かれます。詳しくは [docs/existing-skill-integration.md](docs/existing-skill-integration.md)。
 
+### Codex / Cursor / Antigravity 対応の確認
+
+各エージェントの plugin / skill / hook / subagent 仕様は変わるため、記憶ではなく公式 docs と実機プローブで管理します。
+
+- 互換性表: [docs/agent-compat-matrix.md](docs/agent-compat-matrix.md)
+- このマシンで何が使えるかの確認:
+
+```bash
+bash scripts/probe-agent-platforms.sh
+```
+
+GUI で実際に読み込んでいない Cursor / Antigravity については、「manifest は検証済み」「GUI は未検証」のように分けて記録します。
+
 ## デモ
 
 運営者に見せる時は、先に [docs/demo-youtube-script-loop.md](docs/demo-youtube-script-loop.md) を使ってください。1周目の弱い台本、採点 feedback、2周目の改善、最終レポートの見え方まで 1 ページで説明できます。

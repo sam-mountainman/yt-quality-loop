@@ -13,6 +13,13 @@
 | 対象ユーザー | エンジニア (自分用) | **非エンジニアの YouTube 運営者** |
 | Codex 対応 | evaluator の一部として利用 | **スキル + 無人ランナーとして全面対応** |
 
+## v1.6.1 の追加 (他エージェント互換性の記憶依存を排除)
+
+- `docs/agent-compat-matrix.md` を追加。Claude Code / Codex / Cursor / Antigravity について、plugin・skill・hook・subagent の扱い、公式 docs、実機検証の有無を 1 表で管理する
+- `scripts/probe-agent-platforms.sh` を追加。`codex` / `claude` / `cursor` / `agy` / `gemini` / `gh` / `jq`、GUI アプリ、Codex plugin 状態、GitHub origin を read-only で検出する
+- AGENTS.md に「他エージェント仕様は AI の記憶で断言しない。公式 docs とプローブ結果を残す」ルールを追加
+- `docs/e2e-checklist.md` と README から、互換性表とプローブを配布前チェックに接続
+
 ## v1.2 の修正 (Claude Code 前提からの脱却)
 
 **誤っていた前提の修正:**

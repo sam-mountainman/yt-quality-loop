@@ -17,6 +17,19 @@ bash scripts/validate-packages.sh
 - Gemini CLI extension compatibility validation
 - `git diff --check`
 
+## 1.5. エージェント環境プローブ
+
+```bash
+bash scripts/probe-agent-platforms.sh
+```
+
+確認するもの:
+
+- `codex` / `claude` / `cursor` / `agy` / `gemini` / `gh` / `jq` の検出可否
+- Codex plugin list 上の `yt-quality-loop@yt-quality-loop` の状態
+- Cursor / Antigravity アプリの存在
+- GUI 確認・別マシン確認として残るもの
+
 ## 2. Hook 状態遷移スモーク
 
 ```bash

@@ -31,6 +31,12 @@
 - Codex CLI 0.132.0: exec / 対話とも plugin hook は発火しない (実測)。`$yt-loop-hook` は plugin root 不在を検知して `$yt-loop` にフォールバックする — この縮退を壊さない
 - Node 20+ が必要な CLI (claude 等) を呼ぶスクリプトは、古い node が PATH 先頭の環境を考慮する (validate-packages.sh の Node ガード参照)
 
+## 他エージェント仕様の扱い
+
+- Codex / Cursor / Antigravity / Claude Code の plugin・skill・hook・subagent 仕様は、AI エージェントの記憶で断言しない。変更時は `docs/agent-compat-matrix.md` に公式 docs URL、確認日、実機検証の有無を残す
+- 実機差分は `bash scripts/probe-agent-platforms.sh` で確認する。GUI で読ませていないものは「GUI 検証済み」と書かない
+- vendor 仕様が変わった場合は、先に互換性表とプローブ結果を更新し、その後に manifest / skill / agent / hook を直す
+
 ## 二重正本の方針 (Claude 版 と スキル環境版)
 
 ループのオーケストレーション手順は 2 系統ある:

@@ -78,6 +78,10 @@ else
 fi
 
 echo "== git whitespace =="
-git diff --check
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git diff --check
+else
+  echo "SKIP: not a git worktree"
+fi
 
 echo "validate-packages: ok"
