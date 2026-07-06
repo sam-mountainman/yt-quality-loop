@@ -1,0 +1,14 @@
+{
+  "version": "1",
+  "skill": "assign-yt-script-evaluator",
+  "score_field": "quality.overall",
+  "breakdown_keys": [
+    { "key": "冒頭フック", "weight": 25, "desc": "最初の30秒で『この動画を見る理由』が立つか" },
+    { "key": "視聴維持設計", "weight": 25, "desc": "中だるみがなく、次のセクションへの引きが連続しているか" },
+    { "key": "構成の明確さ", "weight": 20, "desc": "結論先行・1セクション1メッセージ・話の迷子が起きないか" },
+    { "key": "具体性と信頼性", "weight": 20, "desc": "具体例・数字・体験談で裏打ちされ、誇張や根拠のない断定がないか" },
+    { "key": "CTAと導線", "weight": 10, "desc": "登録・コメント・次動画への導線が自然に設計されているか" }
+  ],
+  "passing_rule": "score >= threshold",
+  "notes": "長尺動画台本用の固定 5 軸。キーの増減・言い換えは validate-eval.sh が拒否する。総合点は重みを目安にした総合判断であり、単純平均ではない (1 軸の致命傷が薄まるのを防ぐ)。"
+}

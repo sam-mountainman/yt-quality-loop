@@ -1,0 +1,19 @@
+{
+  "name": "yt-quality-loop",
+  "interface": {
+    "displayName": "YT Quality Loop"
+  },
+  "plugins": [
+    {
+      "name": "yt-quality-loop",
+      "source": {
+        "source": "local",
+        "path": "./codex-plugin"
+      },
+      "policy": {
+        "installation": "AVAILABLE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

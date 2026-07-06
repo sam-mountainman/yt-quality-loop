@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "skill": "assign-yt-planning-evaluator",
+  "score_field": "quality.overall",
+  "breakdown_keys": [
+    { "key": "ターゲット適合", "weight": 30, "desc": "チャンネルの視聴者の不安・欲望に刺さる企画か" },
+    { "key": "差別化", "weight": 25, "desc": "自チャンネルの既存動画・競合の定番と重複していないか。この人が出す理由があるか" },
+    { "key": "需要の根拠", "weight": 25, "desc": "検索・関連・トレンドのどこから見られるかの仮説が立つか。思いつきだけの企画でないか" },
+    { "key": "タイトル・サムネの立てやすさ", "weight": 20, "desc": "クリックさせる切り口が企画の時点で見えているか" }
+  ],
+  "passing_rule": "score >= threshold",
+  "notes": "企画リスト・ネタ出し用の固定 4 軸。案ごとに採点し、総合はセット全体の品質 (使える企画が何本あるか)。キーの増減は validate-eval.sh が拒否する。"
+}

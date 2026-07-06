@@ -1,0 +1,15 @@
+{
+  "version": "1",
+  "skill": "assign-yt-channel-evaluator",
+  "score_field": "quality.overall",
+  "breakdown_keys": [
+    { "key": "冒頭フック", "weight": 20, "desc": "最初の30秒で『この動画を見る理由』が立つか (プロファイルのフックの型に従っているか)" },
+    { "key": "視聴維持設計", "weight": 20, "desc": "中だるみがなく、次のセクションへの引きが連続しているか" },
+    { "key": "構成の型の遵守", "weight": 20, "desc": "channel-profile.md セクション3 の構成の型に従っているか" },
+    { "key": "口調・文体の一致", "weight": 20, "desc": "channel-profile.md セクション4-5 の口調・型フレーズ・表記規則と一致するか" },
+    { "key": "具体性と信頼性", "weight": 15, "desc": "具体例・数字・体験談の裏打ちがあり、誇張がないか (NGリスト抵触は致命減点)" },
+    { "key": "CTAと導線", "weight": 5, "desc": "プロファイルの指定位置・形式で CTA が置かれているか" }
+  ],
+  "passing_rule": "score >= threshold",
+  "notes": "チャンネルプロファイル (.yt-loop/channel-profile.md) を拠り所にする台本採点係。プロファイルが存在する台本タスクで自動選択される。キーの増減・言い換えは validate-eval.sh が拒否する。"
+}

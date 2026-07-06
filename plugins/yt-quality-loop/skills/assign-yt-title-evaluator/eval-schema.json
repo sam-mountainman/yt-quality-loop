@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "skill": "assign-yt-title-evaluator",
+  "score_field": "quality.overall",
+  "breakdown_keys": [
+    { "key": "クリック誘引力", "weight": 30, "desc": "一覧に並んだ時にクリックする理由が立つか" },
+    { "key": "内容整合", "weight": 30, "desc": "動画の中身が約束を果たせるか (釣り耐性)。誇張・過大表現がないか" },
+    { "key": "検索・推薦適合", "weight": 20, "desc": "主要キーワードが自然に前方配置され、検索意図と合うか" },
+    { "key": "文字数と可読性", "weight": 20, "desc": "タイトル全角 28-32 字以内・前半 13 字で意味が立つか。サムネ文言は瞬読できるか (実測)" }
+  ],
+  "passing_rule": "score >= threshold",
+  "notes": "タイトル・サムネ文言用の固定 4 軸。複数案を採点する場合は案ごとに採点し、feedback にベスト案と根拠を書く。キーの増減は validate-eval.sh が拒否する。"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "yt-quality-loop",
+  "description": "YouTube運営者向け品質ループ — 台本・ショート・タイトル案・企画を合格点まで自動で磨き込む",
+  "owner": {
+    "name": "Masa",
+    "email": "bondai2025@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "yt-quality-loop",
+      "source": "./cursor-plugin",
+      "version": "1.1.0",
+      "description": "品質スコアが合格点に達するまで自動改善ループで YouTube 向け成果物を作り込むプラグイン"
+    }
+  ]
+}

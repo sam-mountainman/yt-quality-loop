@@ -1,0 +1,14 @@
+{
+  "name": "yt-quality-loop",
+  "version": "1.1.0",
+  "description": "YouTube向け成果物 (台本 / ショート / タイトル・サムネ案 / 企画) を、品質スコアが合格点に達するまで自動改善ループで磨き込むスキル。続行/終了はシェルの整数比較 (loop-judge.sh) が判定する。",
+  "author": {
+    "name": "Masa",
+    "email": "bondai2025@gmail.com"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "YT Quality Loop",
+    "category": "Productivity"
+  }
+}

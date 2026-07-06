@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "skill": "assign-yt-shorts-evaluator",
+  "score_field": "quality.overall",
+  "breakdown_keys": [
+    { "key": "冒頭2秒フック", "weight": 35, "desc": "最初の 1 文 (≒2 秒) でスワイプを止められるか" },
+    { "key": "テンポ密度", "weight": 25, "desc": "1 文 1 義で無駄ゼロ。削れる文が残っていないか" },
+    { "key": "オチとループ性", "weight": 20, "desc": "最後に納得 or 意外性があり、冒頭に戻っても違和感がないか" },
+    { "key": "尺と文字数規律", "weight": 20, "desc": "指定尺に収まる読み上げ分量か (実測)" }
+  ],
+  "passing_rule": "score >= threshold",
+  "notes": "ショート動画台本用の固定 4 軸。キーの増減・言い換えは validate-eval.sh が拒否する。"
+}
