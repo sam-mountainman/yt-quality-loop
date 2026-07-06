@@ -28,6 +28,8 @@ Codex には 2 つの使い方があります。
 
 Codex の plugin hooks は、インストール/有効化だけでは自動信頼されません。Codex の hook UI または `/hooks` 相当の確認画面で `yt-quality-loop` の hook 定義を確認して信頼してください。信頼しない場合は `$yt-loop` を使います。
 
+**実測 (2026-07-06, v0.132.0)**: `codex exec` (非対話) では hook が発火しません (`--dangerously-bypass-hook-trust` 付きでも、plugin/リポジトリ hook とも)。その場合も `$yt-loop-hook` は plugin root 不在を検知して **`$yt-loop` に自動フォールバックし、納品まで完走することを実 Codex で確認済み** (自己採点だった場合は開示されます)。hook 駆動が使えるのは対話モードのみと考えてください (対話モードの発火は未検証 — docs/e2e-checklist.md 参照)。exec / 自動化では最初から `$yt-loop` か無人ランナーを使います。
+
 Codex custom agent を直接使いたい場合は、フォールバックインストーラが `codex/agents/yt_quality_evaluator.toml` を `~/.codex/agents/` に入れます。
 
 ### Cursor (プラグイン)
