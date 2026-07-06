@@ -6,6 +6,7 @@ set -euo pipefail
 #
 # 指紋の対象 = threshold / criteria / generator_skill / evaluator_skill / max_iterations
 #            + channel-profile.md の中身 + mechanical-checks.json の中身
+#            + brief_file (動画ブリーフ) の中身
 # ループの途中でこれらが変わっていたら、Stop hook の pass gate が合格を拒否する。
 # 改ざんを防ぐ壁ではなく「点だけ上げる最短経路を必ず検知する」トリップワイヤ。
 
@@ -29,11 +30,14 @@ hash_stdin() {
   fi
 }
 
+BRIEF=$(jq -r '.brief_file // ""' "$STATE" 2>/dev/null || echo "")
+
 HASH=$(
   {
-    jq -r '[.threshold, .criteria, .generator_skill, .evaluator_skill, .max_iterations] | @json' "$STATE" 2>/dev/null || true
+    jq -r '[.threshold, .criteria, .generator_skill, .evaluator_skill, .max_iterations, .brief_file] | @json' "$STATE" 2>/dev/null || true
     cat "$PROJ/.yt-loop/channel-profile.md" 2>/dev/null || true
     cat "$PROJ/.yt-loop/mechanical-checks.json" 2>/dev/null || true
+    if [ -n "$BRIEF" ] && [ "$BRIEF" != "null" ]; then cat "$BRIEF" 2>/dev/null || true; fi
   } | hash_stdin
 )
 

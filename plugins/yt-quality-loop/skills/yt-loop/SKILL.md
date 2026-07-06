@@ -49,6 +49,19 @@ allowed-tools: "*"
 
 **task の具体化**: task には「誰向けか / 長さ・分量 / 何を入れて何を入れないか / 何ができたら完成か」が含まれているのが理想。欠けていて推測が危うい場合のみユーザーに 1 回だけ確認する。
 
+**動画ブリーフ (台本系タスクのみ)**: task が薄いままループに入ると「一般的に良い台本」に収束する。台本・ショート系タスクでは、ループ開始前にこの動画 1 本の設計書を `.yt-loop/briefs/` に固定する:
+
+1. task に `brief: <パス>` の指定があればそれを使う
+2. なければ、同梱の `brief-template.md` の 5 項目 (誰向け / 約束する変化 / 絶対入れる話 / 絶対言わない話 / 視聴後の行動) を task から埋める。**task から埋められるならユーザーに聞かずに自動生成してよい** (上の「1 回だけ確認」をこの 5 項目のヒアリングに充ててもよい)
+3. `.yt-loop/briefs/$(date +%Y%m%d-%H%M)-<slug>.md` に Write し、そのパスを Step 2 で state に記録する
+
+```bash
+mkdir -p .yt-loop/briefs
+cat "${CLAUDE_PLUGIN_ROOT}/skills/yt-loop/brief-template.md"
+```
+
+ブリーフは作る係と採点係の両方に渡る (「約束した変化を回収したか」「言わない話に触れていないか」が採点根拠になる)。タイトル・サムネ文言が既に決まっている場合は必ずブリーフに書く — 台本はその約束を回収する義務を負う。台本系以外 (概要欄・タイトル案など) ではブリーフは不要。
+
 ## Step 2: 初期化
 
 UserPromptSubmit hook が `YT_LOOP_SESSION_ID=<id>` をコンテキストに注入しています。この値を使います。
@@ -66,13 +79,13 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/loop-start.sh" "$(pwd)" <max> <threshold> <Y
 次に state.json に task / criteria / evaluator / generator を書き込み、**ものさしの指紋を記録する**:
 
 ```bash
-jq --arg task "<task>" --arg criteria "<criteria>" --arg eval "<evaluator_skill>" --arg gen "<generator_skill>" \
-   '.task=$task | .criteria=$criteria | .evaluator_skill=$eval | .generator_skill=$gen' \
+jq --arg task "<task>" --arg criteria "<criteria>" --arg eval "<evaluator_skill>" --arg gen "<generator_skill>" --arg brief "<brief_file または空>" \
+   '.task=$task | .criteria=$criteria | .evaluator_skill=$eval | .generator_skill=$gen | .brief_file=(if $brief == "" then null else $brief end)' \
    "<STATE_FILE>" > "<STATE_FILE>.tmp" && mv "<STATE_FILE>.tmp" "<STATE_FILE>"
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" "<STATE_FILE>" --record
 ```
 
-generator / evaluator が未指定なら state.json のデフォルト値のまま (jq から省略してよい)。指紋は threshold・criteria・プロファイル・機械ルールのハッシュで、**ループ中にものさしが変更されると Stop hook が合格を拒否する**。
+generator / evaluator が未指定なら state.json のデフォルト値のまま (jq から省略してよい)。指紋は threshold・criteria・プロファイル・機械ルール・**ブリーフ**のハッシュで、**ループ中にものさしが変更されると Stop hook が合格を拒否する** (ブリーフの「絶対言わない話」をループ中に消して合格する抜け道も塞がれる)。
 
 最後に、ループを回し始める前にユーザーへ 1 行だけ見通しを伝える (その後すぐ Step 3 のツール呼び出しへ進む — テキストだけで応答を終えない):
 
@@ -145,6 +158,7 @@ if [ "$ITER" -gt 0 ]; then
 fi
 PROFILE_FILE=""
 [ -f "$(jq -r '.project_dir' "$STATE_FILE")/.yt-loop/channel-profile.md" ] && PROFILE_FILE="$(jq -r '.project_dir' "$STATE_FILE")/.yt-loop/channel-profile.md"
+BRIEF_FILE=$(jq -r '.brief_file // ""' "$STATE_FILE")
 
 jq '.phase="plan"' "$STATE_FILE" > "${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
 
@@ -158,7 +172,8 @@ jq -n \
   --arg artifact_file "$ARTIFACT_FILE" \
   --arg prev_artifact_file "$PREV_ARTIFACT" \
   --arg profile_file "$PROFILE_FILE" \
-  '{project_dir:$project_dir, task:$task, plan:$plan, criteria:$criteria, iteration:$iteration, turns_dir:$turns_dir, artifact_file:$artifact_file, prev_artifact_file:(if $prev_artifact_file == "" then null else $prev_artifact_file end), profile_file:(if $profile_file == "" then null else $profile_file end)}' \
+  --arg brief_file "$BRIEF_FILE" \
+  '{project_dir:$project_dir, task:$task, plan:$plan, criteria:$criteria, iteration:$iteration, turns_dir:$turns_dir, artifact_file:$artifact_file, prev_artifact_file:(if $prev_artifact_file == "" then null else $prev_artifact_file end), profile_file:(if $profile_file == "" then null else $profile_file end), brief_file:(if $brief_file == "" or $brief_file == "null" then null else $brief_file end)}' \
   > "$SESSION_DIR/generator-context.json"
 jq '.phase="generator"' "$STATE_FILE" > "${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
 GEN_SKILL=$(jq -r '.generator_skill // "assign-yt-generator"' "$STATE_FILE")
@@ -240,6 +255,7 @@ fi
 
 PROFILE_FILE=""
 [ -f "$(jq -r '.project_dir' "$STATE_FILE")/.yt-loop/channel-profile.md" ] && PROFILE_FILE="$(jq -r '.project_dir' "$STATE_FILE")/.yt-loop/channel-profile.md"
+BRIEF_FILE=$(jq -r '.brief_file // ""' "$STATE_FILE")
 
 jq -n \
   --arg task "$(jq -r '.task' "$STATE_FILE")" \
@@ -249,7 +265,8 @@ jq -n \
   --arg evaluator_skill "$EVAL_SKILL" \
   --arg key_instruction "$KEY_INSTRUCTION" \
   --arg profile_file "$PROFILE_FILE" \
-  '{task:$task, criteria:$criteria, artifact_file:$artifact_file, eval_file:$eval_file, evaluator_skill:$evaluator_skill, key_instruction:$key_instruction, profile_file:(if $profile_file == "" then null else $profile_file end)}' \
+  --arg brief_file "$BRIEF_FILE" \
+  '{task:$task, criteria:$criteria, artifact_file:$artifact_file, eval_file:$eval_file, evaluator_skill:$evaluator_skill, key_instruction:$key_instruction, profile_file:(if $profile_file == "" then null else $profile_file end), brief_file:(if $brief_file == "" or $brief_file == "null" then null else $brief_file end)}' \
   > "$SESSION_DIR/evaluator-context.json"
 echo "SKILL:$EVAL_SKILL"
 echo "SCHEMA:$SCHEMA_FILE"
