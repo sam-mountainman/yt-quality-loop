@@ -28,6 +28,22 @@
 - Antigravity は旧 `gemini-extension.json` だけでなく `plugin.json` を主マニフェストに追加。ただしこのマシンに `agy` が無いため実機インストール検証は未実施
 - `sync-packages.sh` を skills だけでなく hooks / scripts / agents も同期する配布用同期スクリプトに変更
 
+## v1.3 の追加 (運営者向け実用性と配布前検証)
+
+**E2E / 配布検証:**
+- `scripts/validate-packages.sh` を追加。shell / JSON / manifest path / agent frontmatter / Claude plugin / Gemini extension compatibility / git whitespace を一括検証
+- `scripts/e2e-smoke.sh` を追加。LLM を呼ばずに `loop-start.sh` → fingerprint → eval → Stop hook `threshold_met` → `hook-prompt-submit.sh` の状態遷移を決定論的に検証
+- `docs/e2e-checklist.md` を追加。Codex / Cursor / Antigravity それぞれの実機確認範囲と、CLI で確認できない範囲を明記
+
+**YouTube 運営者向け導入:**
+- `docs/demo-youtube-script-loop.md` を追加。1周目の弱い台本、採点 feedback、2周目の改善、最終報告を1ページで説明できるデモにした
+- `docs/existing-skill-integration.md` を追加。既存台本スキルを捨てずに generator として差し込む設計を説明
+
+**思い通りの台本に寄せる機能:**
+- `/yt-import-skill` を追加。既存 `SKILL.md` / プロンプトを読み、作る係に残す指示・profile に移すルール・除外すべき危険指示に分解して `.yt-loop/imported-generators/` に保存
+- `profile-template.md` を強化。視聴者の前提知識、冒頭で必ずやる/やらないこと、投稿者が言いたくない主張、根拠が必要な主張、既存スキルから移植したルールを追加
+- `final-report.sh` を追加。納品物コピー、スコア推移、breakdown、残課題、自己採点 fallback の開示、次回 profile 反映メモを state から決定論的に生成
+
 ## 修正した欠点
 
 ### 1. SubagentStart hook が全 subagent に active な state を作り、残骸が無限に溜まる (重大)

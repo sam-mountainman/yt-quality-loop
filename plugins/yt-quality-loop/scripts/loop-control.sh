@@ -69,13 +69,15 @@ emit_final_block() {
   else
     best_line="Best: none (合格評価が一度も無かったため納品できるベスト版はない。$TURNS_DIR のログをユーザーに案内する)"
   fi
+  local report_cmd="bash '$CONTROL_DIR/final-report.sh' '$STATE_FILE'"
   local reason="[$LOOP_LABEL ENDED: $label]
 STATE_FILE=$STATE_FILE
 $best_line
 Final step — do ALL of this now in one response, then end it:
-1. If a best artifact exists, copy it to ./yt-loop-output-<datetime>.md and present the path.
-2. Report in Japanese: 最終/ベストスコアと quality.breakdown、スコア推移、終了理由 ($label)、最後の feedback に残った改善余地。
-3. Add these two notes: 「納品物を手直ししたら /yt-profile 更新 で次回に反映できます」「スコアは同一成果物でも±数点ブレます (90点=伸びる保証ではありません)」
+1. Run this command and use its output as the source of truth for delivery and reporting:
+   $report_cmd
+2. Report in Japanese: 成果物パス、最終/ベストスコアと quality.breakdown、スコア推移、終了理由 ($label)、最後の feedback に残った改善余地。
+3. Add these two notes if the report did not already include them: 「納品物を手直ししたら /yt-profile 更新 で次回に反映できます」「スコアは同一成果物でも±数点ブレます (90点=伸びる保証ではありません)」
 Do NOT restart the loop."
   jq -n --arg reason "$reason" '{"decision":"block","reason":$reason}' 2>/dev/null
 }

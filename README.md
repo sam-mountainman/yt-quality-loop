@@ -75,6 +75,7 @@ claude plugin install yt-quality-loop@yt-quality-loop --scope project
 |---|---|
 | `/yt-loop <作りたいもの>` | 品質ループを開始。合格するか上限に達するまで自動で回る |
 | `/yt-profile` | チャンネルプロファイル (台本の「らしさ」のものさし) を作成・更新する |
+| `/yt-import-skill <SKILL.md>` | 既存の台本スキル/プロンプトを作る係とプロファイルへ移植する |
 | `/yt-doctor` | セットアップ診断。「動かない」時はまずこれ |
 | `/yt-loop-cancel` | 実行中のループを止める (それまでのベスト成果物は残る) |
 
@@ -129,6 +130,18 @@ claude plugin install yt-quality-loop@yt-quality-loop --scope project
 
 あなたのスキルが書き、ループの採点係が検品し、不合格なら直し方付きで差し戻されます。スキル＝専門知識の移植、ループ＝合格までの収束。スキルはループの部品として生き続けます。スキルに書き込んだこだわり・基準の記述は、`/yt-profile` に渡せばプロファイルへ移植もできます。
 
+既存スキルを整理してから使う場合:
+
+```
+/yt-import-skill path/to/my-script-skill/SKILL.md
+```
+
+移植メモは `.yt-loop/imported-generators/` に保存され、`generator:` に指定する名前、プロファイルへ移すべきルール、除外すべき危険指示が分かれます。詳しくは [docs/existing-skill-integration.md](docs/existing-skill-integration.md)。
+
+## デモ
+
+運営者に見せる時は、先に [docs/demo-youtube-script-loop.md](docs/demo-youtube-script-loop.md) を使ってください。1周目の弱い台本、採点 feedback、2周目の改善、最終レポートの見え方まで 1 ページで説明できます。
+
 ## Codex / Cursor / Antigravity で使う
 
 Codex / Cursor はプラグイン形式で、Antigravity は `plugin.json` パッケージとして同梱しています (詳細: [codex/README.md](codex/README.md)):
@@ -180,11 +193,13 @@ bash codex/yt-loop-runner.sh "<task>" [threshold] [max] [criteria]
 yt-quality-loop/
 ├── README.md / CHANGES.md
 ├── sync-packages.sh                    ← スキル正本を各プラグインへ同期
+├── scripts/                            ← 配布前検証 (validate-packages / e2e-smoke)
+├── docs/                               ← デモ、E2E手順、既存スキル連携ガイド
 ├── .claude-plugin/marketplace.json     ← Claude Code マーケットプレイス
 ├── plugins/yt-quality-loop/            ← Claude Code プラグイン本体
 │   ├── hooks/hooks.json                ← UserPromptSubmit / Stop
 │   ├── scripts/                        ← ループ制御 (開始/判定/検証/機械チェック/指紋/診断)
-│   └── skills/                         ← 11 スキル (起動4 + 作る係1 + 採点係6)
+│   └── skills/                         ← 12 スキル (起動/補助5 + 作る係1 + 採点係6)
 ├── .agents/plugins/marketplace.json    ← Codex マーケットプレイス
 ├── codex-plugin/                       ← Codex プラグイン (skills + hooks + scripts + agent 定義)
 ├── .cursor-plugin/marketplace.json     ← Cursor マーケットプレイス
@@ -197,9 +212,13 @@ yt-quality-loop/
 ## 検証
 
 ```bash
+bash scripts/validate-packages.sh
+bash scripts/e2e-smoke.sh
 claude plugin validate plugins/yt-quality-loop --strict
 bash sync-packages.sh
 ```
+
+配布前の確認手順は [docs/e2e-checklist.md](docs/e2e-checklist.md) にまとめています。
 
 配布物に他人のスキル/プラグインを混ぜる時は、中身を一度読んでから。あなたのループに入るものは、あなたが読む。
 

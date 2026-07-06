@@ -140,6 +140,14 @@ bash "$PLUGIN_ROOT_RESOLVED/scripts/validate-eval.sh" "$EVAL_FILE" "-" "$THRESHO
 
 Stop hook が `[YT-loop iteration ENDED: ...]` を返したら、指示どおりベスト成果物を `./yt-loop-output-<datetime>.md` にコピーし、日本語で次を報告します。
 
+まず、終了指示に含まれる `STATE_FILE` を使って次を実行します。
+
+```bash
+bash "$PLUGIN_ROOT_RESOLVED/scripts/final-report.sh" "<STATE_FILE>"
+```
+
+この出力を正本にします。スクリプトが使えない場合のみ手動で以下を報告します。
+
 - 成果物パス
 - ベストスコアと breakdown
 - スコア推移

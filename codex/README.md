@@ -73,6 +73,13 @@ bash codex/yt-loop-runner.sh "AI初心者向け『ChatGPTの始め方』10分動
 
 停止条件は Claude Code 版と同じ 4 つ (合格 / 回数 / 時間 / 進捗ゼロ)。`.yt-loop/channel-profile.md` があれば自動で同梱されます。
 
+## デモと検証
+
+- 運営者向けの説明デモ: `docs/demo-youtube-script-loop.md`
+- 配布前チェックリスト: `docs/e2e-checklist.md`
+- 静的検証: `bash scripts/validate-packages.sh`
+- Hook 状態遷移スモーク: `bash scripts/e2e-smoke.sh`
+
 ## 開発者向け
 
 正本:
