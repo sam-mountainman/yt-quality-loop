@@ -131,20 +131,22 @@ claude plugin install yt-quality-loop@yt-quality-loop --scope project
 
 ## Codex / Cursor / Antigravity で使う
 
-それぞれ正式なプラグインとして入ります (詳細: [codex/README.md](codex/README.md)):
+Codex / Cursor はプラグイン形式で、Antigravity は `plugin.json` パッケージとして同梱しています (詳細: [codex/README.md](codex/README.md)):
 
 ```bash
 # Codex (プラグイン)
 codex plugin marketplace add <このフォルダのパス or GitHubの owner/repo>
 
-# Cursor: マーケットプレイス形式 (.cursor-plugin/) を同梱 — /add-plugin から
-# Antigravity: antigravity-plugin/ を同梱 (実験的)
+# Cursor: マーケットプレイス形式 (.cursor-plugin/ + cursor-plugin/) を同梱
+# Antigravity: plugin.json 形式の antigravity-plugin/ を同梱 (実験的)
 
 # プラグインが使えない環境向け (スキルを直接コピー):
 bash codex/install-skills.sh all
 ```
 
-3 環境ともネイティブの**サブエージェント** (fresh context の子エージェント) を持つため、採点は Claude Code 版と同じく「ループの経緯を知らないまっさらな別の頭」が行います。
+Codex には `$yt-loop-hook` (Stop hook 駆動) と `$yt-loop` (hook なしフォールバック) の 2 経路を同梱しています。Codex の plugin hooks はインストールだけでは自動信頼されないため、hook 定義を確認・信頼してから `$yt-loop-hook` を使ってください。信頼しない場合や Cursor / Antigravity では `$yt-loop` を使います。
+
+3 環境とも採点係のサブエージェント / custom agent 定義を同梱しています。自己採点は通常経路ではなく、fresh な採点係が使えなかった場合だけの最終フォールバックで、最終報告に開示されます。
 
 無人実行 (ターミナルから直接、codex CLI 必須):
 
@@ -184,17 +186,19 @@ yt-quality-loop/
 │   ├── scripts/                        ← ループ制御 (開始/判定/検証/機械チェック/指紋/診断)
 │   └── skills/                         ← 11 スキル (起動4 + 作る係1 + 採点係6)
 ├── .agents/plugins/marketplace.json    ← Codex マーケットプレイス
-├── codex-plugin/                       ← Codex プラグイン (skills 同梱)
+├── codex-plugin/                       ← Codex プラグイン (skills + hooks + scripts + agent 定義)
 ├── .cursor-plugin/marketplace.json     ← Cursor マーケットプレイス
-├── cursor-plugin/                      ← Cursor プラグイン (skills 同梱)
-├── antigravity-plugin/                 ← Antigravity プラグイン (実験的)
-└── codex/                              ← スキル正本 + インストーラ + 無人ランナー
+├── cursor-plugin/                      ← Cursor プラグイン (skills + agents)
+├── antigravity-plugin/                 ← Antigravity プラグイン (plugin.json + skills + agents。実験的)
+├── agents/                             ← Cursor / Antigravity 共通 evaluator agent 正本
+└── codex/                              ← スキル正本 + Codex agent/hook 正本 + インストーラ + 無人ランナー
 ```
 
 ## 検証
 
 ```bash
 claude plugin validate plugins/yt-quality-loop --strict
+bash sync-packages.sh
 ```
 
 配布物に他人のスキル/プラグインを混ぜる時は、中身を一度読んでから。あなたのループに入るものは、あなたが読む。

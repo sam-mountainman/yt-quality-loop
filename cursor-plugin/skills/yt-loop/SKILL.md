@@ -3,11 +3,13 @@ name: yt-loop
 description: YouTube向け成果物 (台本 / ショート台本 / タイトル・サムネ案 / 概要欄など) を、品質スコアが合格点に達するまで自動改善ループで作り込む。「品質ループ」「合格まで磨いて」で使う。
 ---
 
-# YT Quality Loop (スキル環境版: Codex / Cursor / Antigravity)
+# YT Quality Loop (hook を使わないフォールバック版: Codex / Cursor / Antigravity)
 
 作る → 採点する → 直す、を合格点まで繰り返す品質ループです。続行/終了の判定はあなたではなく `scripts/loop-judge.sh` (シェルの整数比較) が行います。**judge の出力に必ず従ってください。**
 
-Claude Code 版との違い: これらの環境には Stop hook がないため、ループは 1 つの応答の中で回します。採点は**サブエージェント (fresh context の子エージェント — Codex / Cursor / Antigravity すべてが対応)** に任せ、使えない場合のみ `codex exec` 子プロセス → 契約付き自己採点 (開示付き) の順に縮退します。
+このスキルは **hook を使わない移植版**です。Codex プラグインで Stop hook を信頼済みなら `$yt-loop-hook` を優先してください。Cursor / Antigravity、または hook を信頼していない Codex では、この `$yt-loop` が安定フォールバックになります。
+
+採点は**サブエージェント (fresh context の子エージェント — Codex / Cursor / Antigravity すべてが対応)** に任せます。使えない場合のみ `codex exec` 子プロセス → 契約付き自己採点 (開示付き) の順に縮退します。自己採点は通常経路ではなく、fresh な採点係が一切使えない時の最終フォールバックです。
 
 ## Step 1: 入力解析
 
@@ -81,7 +83,7 @@ bash <このスキルのディレクトリ>/scripts/mark-fresh.sh <RUN_DIR> <NNN
 bash <このスキルのディレクトリ>/scripts/fresh-eval.sh "$RUN_DIR" NNN
 ```
 
-**最終手段 (原則使わない): 自己採点** — 第1・第2ともに使えない環境のみ。自分で採点して eval JSON を書く (mark-fresh.sh は実行しない — fresh 証明の偽造にあたる)。judge が `SELF-SCORED` と表示するので、Step 4 で必ず開示する。契約: (1) output を開き直して読む (2) criteria の軸を固定キーに 0-100 (3) score = quality.overall (4) 甘くしない — 自分が書いた成果物ほど厳しく見る (5) feedback は修正指示 60 文字以上。
+**最終手段 (原則使わない): 自己採点** — 第1・第2ともに使えない環境のみ。自分で採点して eval JSON を書く (mark-fresh.sh は実行しない — fresh 証明の偽造にあたる)。judge が `SELF-SCORED` と表示するので、Step 4 で必ず開示する。これは「Codex は自己採点する」という設計ではなく、「fresh 採点が使えない環境で黙って通す」事故を開示するためのトリップワイヤ。契約: (1) output を開き直して読む (2) criteria の軸を固定キーに 0-100 (3) score = quality.overall (4) 甘くしない — 自分が書いた成果物ほど厳しく見る (5) feedback は修正指示 60 文字以上。
 
 ### 3d. 判定 (あなたは判定しない)
 

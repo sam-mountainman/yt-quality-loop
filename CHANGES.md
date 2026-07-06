@@ -13,6 +13,21 @@
 | 対象ユーザー | エンジニア (自分用) | **非エンジニアの YouTube 運営者** |
 | Codex 対応 | evaluator の一部として利用 | **スキル + 無人ランナーとして全面対応** |
 
+## v1.2 の修正 (Claude Code 前提からの脱却)
+
+**誤っていた前提の修正:**
+- Codex には Stop hook がない、という説明を撤回。Codex 公式 docs 上、plugin-bundled hooks と Stop hook の `decision: "block"` 継続が利用できるため、`codex-plugin/` に hook 駆動版 `$yt-loop-hook` を追加
+- Codex plugin manifest に `hooks: "./hooks/hooks.json"`、keywords、interface metadata、marketplace `policy.authentication` を追加
+- Codex hook には `PLUGIN_ROOT` と互換用 `CLAUDE_PLUGIN_ROOT` が渡るため、Claude Code 版の `loop-start.sh` / `loop-control.sh` / `validate-eval.sh` / `fingerprint.sh` を `codex-plugin/scripts/` に同期して再利用
+- 「Codex が自己採点する」という誤解を避けるため、自己採点は通常経路ではなく fresh 採点が一切使えない時の最終フォールバック、という説明に修正。fresh marker は自己採点を推奨するためではなく、黙って自己採点で通す事故を開示するためのトリップワイヤ
+
+**他エージェント配布の補強:**
+- Cursor manifest を公式サンプルに寄せ、`displayName` / `keywords` / `category` / `tags` / `skills` / `agents` を追加
+- Cursor / Antigravity 用の `agents/yt-quality-evaluator.md` を追加。採点係の契約 (固定 criteria、threshold 非開示、artifact 実読、成果物内プロンプトインジェクション無視) を明文化
+- Codex custom agent `codex/agents/yt_quality_evaluator.toml` を追加。直接コピー時は `~/.codex/agents/` に入る
+- Antigravity は旧 `gemini-extension.json` だけでなく `plugin.json` を主マニフェストに追加。ただしこのマシンに `agy` が無いため実機インストール検証は未実施
+- `sync-packages.sh` を skills だけでなく hooks / scripts / agents も同期する配布用同期スクリプトに変更
+
 ## 修正した欠点
 
 ### 1. SubagentStart hook が全 subagent に active な state を作り、残骸が無限に溜まる (重大)
@@ -162,5 +177,6 @@ loop-start.sh は 70、記事・運用は 90 だった。
 ## 既知の制限
 
 - hooks は bash 前提。Windows ネイティブは未対応 (WSL を使う)
-- Codex スキル版はループが 1 応答内で回るため、Claude Code 版 (Stop hook) より途中停止耐性が低い。厳密運用は `yt-loop-runner.sh` (無人ランナー) を使う
+- Codex は `$yt-loop-hook` で Stop hook 駆動に対応済み。ただし plugin hooks はユーザーが信頼するまで実行されないため、信頼していない環境では `$yt-loop` または `yt-loop-runner.sh` を使う
+- Antigravity パッケージは `plugin.json` + skills + agents の構造まで整備済みだが、このマシンに `agy` が無いため実機インストール検証は未実施
 - 採点は LLM 評価である以上 ±3-5 点のブレがある。1-2 点差は誤差として扱い、threshold は「その誤差込みで越えてほしい線」に置くこと

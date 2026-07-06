@@ -1,14 +1,33 @@
 {
   "name": "yt-quality-loop",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "YouTube向け成果物 (台本 / ショート / タイトル・サムネ案 / 企画) を、品質スコアが合格点に達するまで自動改善ループで磨き込むスキル。続行/終了はシェルの整数比較 (loop-judge.sh) が判定する。",
   "author": {
     "name": "Masa",
     "email": "bondai2025@gmail.com"
   },
+  "license": "MIT",
+  "keywords": [
+    "youtube",
+    "quality-loop",
+    "eval-loop",
+    "loop-engineering"
+  ],
   "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "YT Quality Loop",
-    "category": "Productivity"
+    "shortDescription": "YouTube台本や企画を品質ループで磨き込む",
+    "longDescription": "YouTube向け成果物を、作成・採点・修正のループで合格点まで磨き込むプラグインです。Codexでは1応答内ループとStop hook駆動ループの両方を同梱します。",
+    "developerName": "Masa",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Use yt-loop to write a YouTube script and improve it until it reaches the quality threshold.",
+      "Use yt-loop-hook for a Codex Stop-hook driven YouTube quality loop."
+    ]
   }
 }
