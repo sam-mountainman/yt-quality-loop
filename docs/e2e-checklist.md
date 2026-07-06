@@ -68,3 +68,10 @@ Cursor CLI には、この repo の plugin marketplace を headless validate す
 - `skills/yt-loop/SKILL.md` が見える
 - `agents/yt-quality-evaluator.md` が見える
 - 旧 Gemini CLI 互換では `gemini-extension.json` が validate される
+
+## 実測記録 (2026-07-06, codex-cli 0.132.0)
+
+- `codex plugin add yt-quality-loop@yt-quality-loop`: ✅ (cache 1.4.0, hooks/skills 展開確認)
+- `$yt-loop-hook` を `codex exec` で実走: hook 未発火 (plugin hook / repo hook とも、`--dangerously-bypass-hook-trust` 付きでも) → **スキルが検知して `$yt-loop` に自動フォールバックし、納品まで完走** (85点・自己採点開示付き・動画ブリーフ自動生成)。exec モードで hook は発火しない模様
+- 対話モードの hook 発火: 未検証 (tmux 無し環境)。対話 Codex で `YT_LOOP_SESSION_ID` 注入の有無を確認すること
+- 公式 docs 確認済み: PLUGIN_ROOT / CLAUDE_PLUGIN_ROOT が plugin hook に渡る、イベント名 PascalCase、decision:block 継続 — 実装は仕様適合
