@@ -119,6 +119,7 @@ jq -n \
     mech_ng: false,
     mech_ng_count: 0,
     config_fingerprint: null,
+    anchors_file: null,
     turns_dir: $turns_dir,
     phase: "plan",
     latest_plan: null

@@ -15,6 +15,7 @@ set -euo pipefail
 #   G7  機械チェック NG 3 連続 → mechanical_check_failed + ENDED
 #   G8  進捗ゼロ (2 回連続スコア停滞) → no_progress + ENDED
 #   G9  max 到達 → ENDED block (納品指示が必ず出る)
+#   G10 採点アンカー改ざん (目盛りをループ中に緩める) → PASS CLAIM REJECTED (指紋)
 #   V1-V4 validate-eval: 加重平均上振れ拒否 / 下方向許容 / 軸過不足拒否 / 短文 feedback 拒否
 #   J1-J4 codex loop-judge: 二重判定ガード / SELF-SCORED 検知 / マーカー有効 / コピペ拒否
 
@@ -179,6 +180,19 @@ OUT=$(run_hook "$D" g9)
 if [ "$(jq -r '.ended_reason' "$S")" = "max_iterations" ] \
    && has "$(reason_of "$OUT")" "Final step"; then ok "G9 max到達 → ENDED+納品指示"; else bad "G9"; fi
 
+# --- G10: 採点アンカー改ざん ----------------------------------------------------
+S=$(new_loop g10 6 90); D="$TMP/g10"; T=$(jq -r '.turns_dir' "$S")
+ANCH="$(dirname "$S")/criteria-anchors.md"
+printf '## a\n- 90+: 冒頭1文目に数字がある\n- 75-89: 数字はあるが2文目以降\n' > "$ANCH"
+jq --arg a "$ANCH" '.anchors_file=$a' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+bash "$P/scripts/fingerprint.sh" "$S" --record >/dev/null
+echo "本文" > "$T/turn-000-output.md"
+write_eval "$T" 000 93 "$FB0"
+printf '## a\n- 90+: なんとなく良い\n' > "$ANCH"   # ループ中に目盛りを緩める
+set_eval_state "$S" 0 93
+OUT=$(run_hook "$D" g10)
+if has "$(reason_of "$OUT")" "changed mid-loop"; then ok "G10 アンカー改ざん → 拒否"; else bad "G10"; fi
+
 # --- V1-V4: validate-eval ------------------------------------------------------
 SCHEMA="$P/skills/assign-yt-script-evaluator/eval-schema.json"
 mk_script_eval() { # $1=overall $2=hook_score $3=out
@@ -217,4 +231,4 @@ if [ "$FAIL" -ne 0 ]; then
   echo "guard-tests: FAILED" >&2
   exit 1
 fi
-echo "guard-tests: ok (G1-G9, V1-V4, J1-J4)"
+echo "guard-tests: ok (G1-G10, V1-V4, J1-J4)"
