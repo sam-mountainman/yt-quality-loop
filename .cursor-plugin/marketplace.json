@@ -9,7 +9,7 @@
     {
       "name": "yt-quality-loop",
       "source": "./cursor-plugin",
-      "version": "1.6.2",
+      "version": "1.6.3",
       "description": "品質スコアが合格点に達するまで自動改善ループで YouTube 向け成果物を作り込むプラグイン"
     }
   ]

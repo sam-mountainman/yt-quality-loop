@@ -1,7 +1,7 @@
 {
   "name": "yt-quality-loop",
   "displayName": "YT Quality Loop",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "YouTube向け成果物 (台本 / ショート / タイトル・サムネ案 / 企画) を、品質スコアが合格点に達するまで自動改善ループで磨き込むスキル。",
   "author": {
     "name": "Masa",
@@ -14,7 +14,7 @@
     "eval-loop",
     "agent-skills"
   ],
-  "icon": "./assets/icon.svg",
+  "icon": "./assets/icon.png",
   "skills": "./skills/",
   "agents": "./agents/"
 }

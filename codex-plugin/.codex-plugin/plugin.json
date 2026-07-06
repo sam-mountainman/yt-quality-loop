@@ -1,6 +1,6 @@
 {
   "name": "yt-quality-loop",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "YouTube向け成果物 (台本 / ショート / タイトル・サムネ案 / 企画) を、品質スコアが合格点に達するまで自動改善ループで磨き込むスキル。続行/終了はシェルの整数比較 (loop-judge.sh) が判定する。",
   "author": {
     "name": "Masa",
@@ -22,8 +22,8 @@
     "developerName": "Masa",
     "category": "Productivity",
     "brandColor": "#ff0033",
-    "composerIcon": "./assets/icon-small.svg",
-    "logo": "./assets/icon.svg",
+    "composerIcon": "./assets/icon-small.png",
+    "logo": "./assets/icon.png",
     "capabilities": [
       "Read",
       "Write"

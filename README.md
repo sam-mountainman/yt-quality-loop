@@ -1,6 +1,6 @@
 # yt-quality-loop
 
-![YT Quality Loop icon](assets/icon.svg)
+![YT Quality Loop icon](assets/icon.png)
 
 **YouTube 向けの成果物 (台本 / ショート台本 / タイトル・サムネ案 / 企画 / 概要欄) を、品質スコアが合格点に達するまで AI が自動で磨き込むプラグイン**です。Claude Code・Codex・Cursor・Antigravity で使えます。
 

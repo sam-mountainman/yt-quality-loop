@@ -27,6 +27,12 @@
 - Cursor plugin は `logo`、Antigravity plugin は `icon` で同梱アイコンを参照
 - `assets/NOTICE.md` に素材ソースとライセンスを明記
 
+## v1.6.3 の変更 (生成画像アイコンへ差し替え)
+
+- 手書き SVG アイコンを廃止し、AI 生成の 3D 赤黒アプリアイコン (`assets/icon.png` / `assets/icon-small.png`) に差し替え
+- Codex / Cursor / Antigravity の manifest 参照を PNG に更新
+- `assets/NOTICE.md` を生成画像アイコン向けの説明に更新
+
 ## v1.2 の修正 (Claude Code 前提からの脱却)
 
 **誤っていた前提の修正:**
