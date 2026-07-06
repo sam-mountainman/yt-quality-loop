@@ -5,6 +5,21 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# claude CLI など Node 製 CLI は Node 20+ が必要。PATH の先頭が古い node (nvm の
+# 旧バージョン等) だと /v 正規表現フラグで即死するため、新しい node を前置する。
+if command -v node >/dev/null 2>&1; then
+  NODE_MAJOR=$(node -v 2>/dev/null | sed "s/^v\\([0-9]*\\).*/\\1/")
+  if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -lt 20 ] 2>/dev/null; then
+    NEWNODE=$(ls -d "$HOME"/.nvm/versions/node/v2[0-9]*/bin 2>/dev/null | sort -V | tail -1)
+    if [ -n "$NEWNODE" ]; then
+      export PATH="$NEWNODE:$PATH"
+      echo "NOTICE: node $(node -v) を使用 (旧 node は claude CLI を壊すため差し替え)"
+    else
+      echo "WARNING: node が v20 未満です。claude plugin validate が失敗する可能性があります" >&2
+    fi
+  fi
+fi
+
 echo "== shell syntax =="
 find . -name '*.sh' -type f -not -path './.git/*' -print0 | xargs -0 -n1 bash -n
 
