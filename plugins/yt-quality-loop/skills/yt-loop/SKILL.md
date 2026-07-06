@@ -26,6 +26,14 @@ allowed-tools: "*"
 | **evaluator** | 自動選択 | 採点する係の skill 名 (明示指定も可) |
 | **generator** | assign-yt-generator | 作る係の skill 名。**ユーザーの既存の台本スキル名を指定できる** (例: `generator: my-script-skill`)。既存スキルはそのまま「作る係」の席に座り、採点と差し戻しはループが行う |
 
+**カスタム generator の red-flag 検査**: `generator:` が非デフォルトの場合、ループ開始前にそのスキルの SKILL.md 原本を grep で検査する:
+
+```bash
+grep -nE "採点|評価|eval|点数|基準を満た|クリア済|チェック済" "<そのスキルのSKILL.mdパス>" | head -5
+```
+
+ヒットがあれば開始宣言に 1 行警告を添える: 「⚠ このスキルには採点・評価に触れる指示が含まれます (該当行)。成果物に『基準クリア済み』等の注記を埋め込む指示は採点係が減点対象として扱います」。ヒットゼロなら何も言わない。
+
 **チャンネルプロファイルの検出** (evaluator 選択の前に必ず確認):
 
 ```bash
@@ -76,31 +84,38 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/loop-start.sh" "$(pwd)" <max> <threshold> <Y
 
 出力の **"State file:" の行から STATE_FILE のパスを取得して、以降すべてそのパスを使うこと。**
 
-次に state.json に task / criteria / evaluator / generator を書き込み、**ものさしの指紋を記録する**:
+次に state.json に task / criteria / evaluator / generator / ブリーフを書き込む (**指紋の記録はまだしない** — アンカー起草の後):
 
 ```bash
 jq --arg task "<task>" --arg criteria "<criteria>" --arg eval "<evaluator_skill>" --arg gen "<generator_skill>" --arg brief "<brief_file または空>" \
    '.task=$task | .criteria=$criteria | .evaluator_skill=$eval | .generator_skill=$gen | .brief_file=(if $brief == "" then null else $brief end)' \
    "<STATE_FILE>" > "<STATE_FILE>.tmp" && mv "<STATE_FILE>.tmp" "<STATE_FILE>"
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" "<STATE_FILE>" --record
 ```
 
 generator / evaluator が未指定なら state.json のデフォルト値のまま (jq から省略してよい)。
 
-**採点アンカーの起草 (汎用 evaluator = 自由 criteria の時のみ)**: 自作/自動設定した criteria には 90 点/75 点の目盛りが無く、採点が周回ごとにブレる。**指紋を記録する前・最初の生成が走る前に**、軸ごとの採点アンカーを起草して固定する:
+**採点アンカーの起草 (汎用 evaluator = 自由 criteria の時は必須)**: 自作/自動設定した criteria には 90 点/75 点の目盛りが無く、採点が周回ごとにブレる。軸ごとの採点アンカーを起草して固定する (**Stop hook の pass gate は、汎用 evaluator でアンカー未設定の合格を拒否する**):
 
 1. ユーザーが `anchors: <パス>` を指定していればそのファイルを使う (前回のアンカーの再利用)
 2. なければ、各軸に 90+/75-89/60-74/<60 の帯を**観測可能な行動の記述**で書いたアンカーを起草し、`<SESSION_DIR>/criteria-anchors.md` に Write する (SESSION_DIR = STATE_FILE のあるディレクトリ。プリセット採点係の SKILL.md にあるアンカーが書き方の手本。形容詞は禁止)
 3. `jq --arg a "<アンカーのパス>" '.anchors_file=$a' "<STATE_FILE>" > tmp && mv tmp "<STATE_FILE>"`
 
-**起草は必ず最初の生成の前。** 一度でも生成が走った後にアンカーを書くと「今の成果物が高く出る目盛り」を引く誘惑が生まれる。アンカーは指紋の対象で、ループ中に書き換えると合格が拒否される。プリセット採点係 (script/shorts/title/planning/channel) はアンカー内蔵なので不要。
+**起草は必ず最初の生成の前。** 一度でも生成が走った後にアンカーを書くと「今の成果物が高く出る目盛り」を引く誘惑が生まれる (記録時刻と最初の生成物の mtime は pass gate が機械照合する)。プリセット採点係 (script/shorts/title/planning/channel) はアンカー内蔵なので不要。
 
-上記が終わってから指紋を記録する。指紋は threshold・criteria・プロファイル・機械ルール・**ブリーフ・アンカー**のハッシュで、**ループ中にものさしが変更されると Stop hook が合格を拒否する** (ブリーフの「絶対言わない話」をループ中に消す・アンカーの目盛りを緩める、という抜け道も塞がれる)。
+**ブリーフとアンカーを書き終えてから**、最後に指紋を記録する:
 
-最後に、ループを回し始める前にユーザーへ 2 行だけ見通しを伝える (その後すぐ Step 3 のツール呼び出しへ進む — テキストだけで応答を終えない):
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" "<STATE_FILE>" --record
+```
+
+指紋は threshold・criteria・プロファイル・機械ルール・**ブリーフ・アンカー・採点係の定義 (SKILL.md/schema)** のハッシュで、**ループ中にものさしが変更されると Stop hook が合格を拒否する** (ブリーフの「絶対言わない話」を消す・アンカーやプリセットの目盛りを緩める、という抜け道も塞がれる)。record は一度しかできないので、必ずこの順序で実行すること。
+
+最後に、ループを回し始める前にユーザーへ見通しを伝える (その後すぐ Step 3 のツール呼び出しへ進む — テキストだけで応答を終えない):
 
 > ループ開始: 最大 <max> 周 / 合格点 <threshold> / 時間上限 <max_wall> 分。**採点係: <evaluator 名> (軸: <criteria>)** — 軸を変えるには `criteria:` 指定、チャンネル固有にするには /yt-profile。
-> 1 周の目安は 10〜25 分 (プロファイル付き台本は長め)、多くは 2〜4 周で収束します。途中で止める: /yt-loop-cancel。合格に届かなくてもベスト版は必ず納品します。
+> {ブリーフを作った場合: ブリーフ: <パス> — 約束する変化「<1行要約>」/ 絶対言わない話「<1行要約>」}
+> {アンカーを起草した場合: 採点アンカー: <パス> (90点の目盛りはこのファイルで確認できます)}
+> 1 周の目安は 10〜25 分 (プロファイル付き台本は長め)、多くは 2〜4 周で収束します。途中で止める: /yt-loop-cancel。ベスト版は必ず納品します。
 
 固定軸 evaluator (script/shorts/title) を使う場合、criteria にはその evaluator の軸名をそのまま書く (eval-schema.json の breakdown_keys と一致させる)。
 
@@ -319,11 +334,11 @@ fi
 
 ### 3d-2. 確認採点 (SCORE >= THRESHOLD の時のみ)
 
-LLM 採点は同一成果物でも±数点ブレる。6 周引けば 1 回はまぐれの 90+ が出る (ガチャ合格)。**合格が出た時だけ**、まっさらな evaluator でもう 1 回採点し、**低い方を採用する**:
+LLM 採点は同一成果物でも±数点ブレる。6 周引けば 1 回はまぐれの 90+ が出る (ガチャ合格)。**合格が出た時は必ず**、まっさらな evaluator でもう 1 回採点し、**低い方を採用する**。これは省略できない — **Stop hook の pass gate が「確認採点の実在・本採点とのバイト相違・min(2採点) >= threshold」を機械検証し、無い/コピーの合格主張は拒否する**:
 
-1. 3c と同じコンテキスト JSON の `eval_file` だけを `$TURNS_DIR/turn-$NNN-eval-confirm.json` に変えて、evaluator をもう一度 Skill ツールで起動する
-2. confirm 側も validate-eval.sh で検証する (INVALID なら confirm は無効 — 初回の値を使う)
-3. **confirm の score が低ければ** `cp "$TURNS_DIR/turn-$NNN-eval-confirm.json" "$EVAL_FILE"` で正本を差し替える (どちらも evaluator が書いた実物なので改ざんではない)
+1. 3c と同じコンテキスト JSON の `eval_file` だけを `$TURNS_DIR/turn-$NNN-eval-confirm.json` に変えて、evaluator をもう一度 Skill ツールで起動する (本採点のコピーで代用しない — バイト一致は機械的に弾かれる)
+2. confirm 側も validate-eval.sh で検証する (INVALID なら evaluator を再実行して confirm を取り直す)
+3. **confirm の score が低ければ** `cp "$TURNS_DIR/turn-$NNN-eval-confirm.json" "$EVAL_FILE"` の前に本採点を `$TURNS_DIR/turn-$NNN-eval-first.json` として退避してから正本を差し替える… は不要 — 差し替えず、state の latest_score に低い方を書けばよい (pass gate が両ファイルを読んで min を採る)。confirm が threshold 未満なら合格主張せず、低い方を latest_score にして通常どおり応答を終了する (ループ続行)
 
 ### 3e. スコア書き戻し + 応答終了
 
@@ -346,11 +361,11 @@ artifact のハッシュも同時に記録する (採点後に成果物を書き
   - 未達 → hook が次イテレーションを自動開始
   - 合格主張 → hook が **検証** (eval JSON 直読・契約・機械チェック再実行・指紋照合) してから終了させる
   - max / 時間切れ / 進捗ゼロ → hook が終了させる
-- どの終わり方でも、hook が `[YT-loop ENDED: <理由>]` という最終指示を送ってくる。それを受けたら Step 4 を実行する。
+- どの終わり方でも、hook が `[YT-loop iteration ENDED: <理由>]` という最終指示を送ってくる。それを受けたら Step 4 を実行する。
 
 ## Step 4: 完了処理 (hook の ENDED 指示を受けたら)
 
-`[YT-loop ENDED: ...]` を受けたら、その指示に従って 1 応答で完了させる。まず `final-report.sh` を実行し、その出力を最終報告の正本にする:
+`[YT-loop iteration ENDED: ...]` を受けたら、その指示に従って 1 応答で完了させる。まず `final-report.sh` を実行し、その出力を最終報告の正本にする:
 
 ```bash
 STATE_FILE="<ENDED 指示内の STATE_FILE>"

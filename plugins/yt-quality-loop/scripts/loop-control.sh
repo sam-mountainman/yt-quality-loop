@@ -258,17 +258,77 @@ if [ "$SCORE" != "null" ] && [ "$SCORE" -ge "$THRESHOLD" ] 2>/dev/null; then
     else
       CUR_FP=$(bash "$CONTROL_DIR/fingerprint.sh" "$STATE_FILE" 2>/dev/null) || CUR_FP=""
       if [ -n "$CUR_FP" ] && [ "$CUR_FP" != "$FP" ]; then
-        VERIFY_FAIL="scoring config (threshold/criteria/profile/mechanical rules) changed mid-loop — ものさしの途中変更は合格にできない"
+        VERIFY_FAIL="scoring config (threshold/criteria/profile/mechanical rules/brief/anchors/evaluator定義) changed mid-loop — ものさしの途中変更は合格にできない"
+      fi
+    fi
+  fi
+  # 起草順序の照合: 指紋の記録は最初の生成より前でなければならない
+  # (生成後に記録すると「今の成果物が高く出るものさし」を引ける)
+  if [ -z "$VERIFY_FAIL" ]; then
+    REC_AT=$(jq -r '.fingerprint_recorded_at // ""' "$STATE_FILE" 2>/dev/null) || REC_AT=""
+    FIRST_OUT="$TURNS_DIR/turn-000-output.md"
+    if [[ "$REC_AT" =~ ^[0-9]+$ ]] && [ -f "$FIRST_OUT" ]; then
+      OUT_MTIME=$(stat -c %Y "$FIRST_OUT" 2>/dev/null || stat -f %m "$FIRST_OUT" 2>/dev/null) || OUT_MTIME=""
+      if [[ "$OUT_MTIME" =~ ^[0-9]+$ ]] && [ "$OUT_MTIME" -lt "$REC_AT" ]; then
+        VERIFY_FAIL="config fingerprint was recorded AFTER generation started — ものさしは最初の生成の前に固定する"
+      fi
+    fi
+  fi
+  # 自由 criteria (汎用 evaluator / codex-hook) は採点アンカー必須
+  RUNTIME=$(jq -r '.runtime // ""' "$STATE_FILE" 2>/dev/null) || RUNTIME=""
+  if [ -z "$VERIFY_FAIL" ]; then
+    ANCH=$(jq -r '.anchors_file // ""' "$STATE_FILE" 2>/dev/null) || ANCH=""
+    if { [ "$EVAL_SKILL" = "assign-yt-evaluator" ] || [ "$RUNTIME" = "codex-hook" ]; } \
+       && { [ -z "$ANCH" ] || [ "$ANCH" = "null" ]; }; then
+      VERIFY_FAIL="anchors_file is not set — 自由 criteria は採点アンカー (90/75の目盛り) を起草・固定してから回す"
+    fi
+  fi
+  # 確認採点の実在と一致: 合格主張には独立した 2 回目の採点が必要 (ガチャ合格・省略の封鎖)
+  FINAL_SCORE="$EVAL_SCORE"
+  if [ -z "$VERIFY_FAIL" ]; then
+    CONFIRM_FILE="$TURNS_DIR/turn-$NNN-eval-confirm.json"
+    if [ ! -f "$CONFIRM_FILE" ]; then
+      VERIFY_FAIL="confirmation eval not found ($CONFIRM_FILE) — 合格主張には確認採点 (3d-2) が必要"
+    elif [ "$(hash_of "$EVAL_FILE")" = "$(hash_of "$CONFIRM_FILE")" ]; then
+      VERIFY_FAIL="confirmation eval is byte-identical to the primary eval — コピーは確認採点ではない"
+    else
+      SCHEMA_FILE2="$CONTROL_DIR/../skills/$EVAL_SKILL/eval-schema.json"
+      [ -f "$SCHEMA_FILE2" ] || SCHEMA_FILE2="-"
+      if ! bash "$CONTROL_DIR/validate-eval.sh" "$CONFIRM_FILE" "$SCHEMA_FILE2" "$THRESHOLD" "$CRITERIA" >/dev/null 2>&1; then
+        VERIFY_FAIL="confirmation eval failed contract validation"
+      else
+        CSCORE=$(jq -r '.score // "null"' "$CONFIRM_FILE" 2>/dev/null) || CSCORE="null"
+        if ! [[ "$CSCORE" =~ ^[0-9]+$ ]]; then
+          VERIFY_FAIL="confirmation eval score is not an integer"
+        elif [ "$CSCORE" -lt "$THRESHOLD" ]; then
+          VERIFY_FAIL="confirmation score ($CSCORE) is below threshold — 低い方を採用してループを続行する (合格主張しない)"
+        elif [ "$CSCORE" -lt "$FINAL_SCORE" ]; then
+          FINAL_SCORE="$CSCORE"
+        fi
       fi
     fi
   fi
   if [ -z "$VERIFY_FAIL" ]; then
-    jq --argjson s "$EVAL_SCORE" --argjson i "$ITERATION" \
+    # codex-hook 経路: fresh 証明マーカーが無い/不一致の合格は SELF-SCORED として開示する (拒否はしない)
+    SELF_NOTE=""
+    if [ "$RUNTIME" = "codex-hook" ]; then
+      MARKER="$TURNS_DIR/turn-$NNN-eval.fresh"
+      MOK="false"
+      if [ -f "$MARKER" ] && [ "$(cat "$MARKER" 2>/dev/null)" = "$(hash_of "$EVAL_FILE")" ]; then
+        MOK="true"
+      fi
+      if [ "$MOK" != "true" ]; then
+        SELF_NOTE=" / SELF-SCORED (fresh 証明なし — 最終報告で必ず開示)"
+        jq --argjson i "$ITERATION" '.self_scored = ((.self_scored // []) + [$i])' \
+          "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE" 2>/dev/null
+      fi
+    fi
+    jq --argjson s "$FINAL_SCORE" --argjson i "$ITERATION" \
       '.latest_score = $s
        | (if (.best_score == null or $s > .best_score) then .best_score = $s | .best_iteration = $i else . end)' \
       "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE" 2>/dev/null
     finalize "threshold_met"
-    emit_final_block "threshold_met (合格 — 検証済み: eval JSON 直読 / 契約 / 機械チェック / 指紋)"
+    emit_final_block "threshold_met (合格 — 検証済み: eval 直読 / 契約 / 機械チェック / hash / 指紋 / 確認採点)$SELF_NOTE"
     exit 0
   fi
   # 合格主張が検証に落ちた

@@ -8,7 +8,7 @@
 |---|---|---|
 | ループ方式 | serial / fork / parallel の 3 系統 | **serial のみ** |
 | hooks | UserPromptSubmit / Stop / SubagentStart / SubagentStop | **UserPromptSubmit / Stop のみ** |
-| evaluator | 汎用 / multi / debate (Codex 連携) | **汎用 + YouTube 特化 3 種 (固定軸)** |
+| evaluator | 汎用 / multi / debate (Codex 連携) | **汎用 + YouTube 特化 5 種 (台本/ショート/タイトル/企画/チャンネル適合、固定軸)** |
 | 成果物の保全 | git 隠し ref への snapshot | **イテレーション毎のファイル保存** (git 不要) |
 | 対象ユーザー | エンジニア (自分用) | **非エンジニアの YouTube 運営者** |
 | Codex 対応 | evaluator の一部として利用 | **スキル + 無人ランナーとして全面対応** |
@@ -133,6 +133,16 @@ loop-start.sh は 70、記事・運用は 90 だった。
 - Cursor: `.cursor-plugin/marketplace.json` + `cursor-plugin/` (Cursor 2.5 のマーケットプレイス形式)
 - Antigravity: `antigravity-plugin/` (実験的 — 旧 Gemini CLI 拡張形式)
 - `sync-packages.sh` でスキル正本 (codex/skills) から各パッケージへ同期
+
+## v1.6 での堅牢化 (3体の監査エージェントのレビューに基づく)
+
+**実バグ修正:** 指紋記録とアンカー起草の順序矛盾 (自由criteria経路で合格が全拒否される) / codex hook版のbrief・anchors配線漏れ (指紋対象外だった) / $RUN_DIR誤参照 / mechanical:true未指定 / ENDEDラベル表記 / チャンネル適合6軸の説明誤り (7軸に読める・codex側5軸)
+
+**トリップワイヤの施工完了:** final-report.sh に裏取り節 (state自己申告とeval実物・hash・指紋を照合、不一致は「VERIFY FAILED」を明示。未採点終了時は最新生成物を未採点ドラフトとして納品) / プリセット採点係のSKILL.md・eval-schemaも指紋対象に / 自由criteriaのアンカー無し合格を拒否 / 指紋の記録時刻と最初の生成物のmtimeを照合 (生成後にものさしを固定した合格を拒否) / **確認採点をpass gateで機械検証** (実在・本採点とのバイト相違・min(2採点)>=threshold — コピー偽装はsha一致で弾く) / codex-hook経路のSELF-SCORED開示をhook側でも検証・記録
+
+**目盛りの可視化 (機械判定しない領域は人間の目に返す):** 開始宣言にブリーフの「約束する変化・言わない話」要約とアンカーのパスを表示 / learn-from-editは「〜する」追加形のみ・緩和形は別枠確認・forbidden_wordsは追加のみ / セクション8は採点緩和の根拠にしない / カスタムgeneratorのred-flag grep警告
+
+**テスト:** G11-G15 (final-report裏取り/プリセット指紋/確認採点3態/機械NG復帰/cancel詐欺ガード)・V5-V6 を追加し計25本。e2e-smokeは正本と同期コピーの両方を検証するよう変更
 
 ## v1.1 での堅牢化 (Fable 5 サブエージェント 3 体のレビューに基づく)
 

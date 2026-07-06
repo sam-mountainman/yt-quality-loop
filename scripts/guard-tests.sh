@@ -67,6 +67,19 @@ set_eval_state() { # $1=state $2=iter $3=score
     "$1" > "$1.tmp" && mv "$1.tmp" "$1"
 }
 
+set_anchors() { # $1=state — アンカーを作って anchors_file に登録 (fingerprint --record の前に呼ぶ)
+  local a
+  a="$(dirname "$1")/criteria-anchors.md"
+  printf '## a\n- 90+: 冒頭1文目に具体的な数字がある\n## b\n- 90+: まとめが1文で締まり行動をひとつ指定する\n' > "$a"
+  jq --arg a "$a" '.anchors_file=$a' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
+}
+
+write_confirm() { # $1=turns_dir $2=NNN $3=score $4=feedback
+  jq -n --argjson s "$3" --arg fb "$4" \
+    '{score:$s, quality:{overall:$s, breakdown:{a:($s-1), b:($s+1)}}, feedback:$fb, evaluator_skill:"e"}' \
+    > "$1/turn-$2-eval-confirm.json"
+}
+
 run_hook() { # $1=cwd $2=session_id → stdout: hook output
   printf '{"cwd":"%s","session_id":"%s","hook_event_name":"Stop"}' "$1" "$2" \
     | bash "$P/scripts/hook-stop.sh"
@@ -74,17 +87,20 @@ run_hook() { # $1=cwd $2=session_id → stdout: hook output
 
 reason_of() { printf '%s' "$1" | jq -r '.reason // ""' 2>/dev/null || true; }
 
-# --- G1: 正規合格 -----------------------------------------------------------
+# --- G1: 正規合格 (アンカー + 確認採点つき。低い方=92 が採用される) -------------
 S=$(new_loop g1 6 90); D="$TMP/g1"; T=$(jq -r '.turns_dir' "$S")
+set_anchors "$S"
 bash "$P/scripts/fingerprint.sh" "$S" --record >/dev/null
 echo "本文" > "$T/turn-000-output.md"
 write_eval "$T" 000 92 "$FB0"
+write_confirm "$T" 000 93 "$FB1"
 SHA=$( { shasum -a 256 "$T/turn-000-output.md" 2>/dev/null || sha256sum "$T/turn-000-output.md"; } | cut -d' ' -f1 )
 jq --arg sha "$SHA" '.artifact_hashes={"000":$sha}' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
 set_eval_state "$S" 0 92
 OUT=$(run_hook "$D" g1)
 if has "$(reason_of "$OUT")" "ENDED: threshold_met" \
-   && [ "$(jq -r '.ended_reason' "$S")" = "threshold_met" ]; then ok "G1 正規合格 → ENDED"; else bad "G1 (reason: $(reason_of "$OUT" | head -1) / ended: $(jq -r '.ended_reason' "$S") / repair: $(jq -r '.eval_repair_attempts' "$S"))"; fi
+   && [ "$(jq -r '.ended_reason' "$S")" = "threshold_met" ] \
+   && [ "$(jq -r '.latest_score' "$S")" = "92" ]; then ok "G1 正規合格 (min採用) → ENDED"; else bad "G1 (reason: $(reason_of "$OUT" | head -1) / ended: $(jq -r '.ended_reason' "$S") / score: $(jq -r '.latest_score' "$S"))"; fi
 
 # --- G2: スコア水増し --------------------------------------------------------
 S=$(new_loop g2 6 90); D="$TMP/g2"; T=$(jq -r '.turns_dir' "$S")
@@ -193,6 +209,62 @@ set_eval_state "$S" 0 93
 OUT=$(run_hook "$D" g10)
 if has "$(reason_of "$OUT")" "changed mid-loop"; then ok "G10 アンカー改ざん → 拒否"; else bad "G10"; fi
 
+# --- G11: final-report の裏取り (state 偽造 → VERIFY FAILED) --------------------
+S=$(new_loop g11 6 90); D="$TMP/g11"; T=$(jq -r '.turns_dir' "$S")
+echo "本文" > "$T/turn-000-output.md"
+write_eval "$T" 000 87 "$FB0"
+jq '.active=false | .ended_reason="threshold_met" | .best_score=92 | .best_iteration=0' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+RPT=$(bash "$P/scripts/final-report.sh" "$S" "$TMP/g11-out.md" 2>/dev/null || true)
+if has "$RPT" "VERIFY FAILED"; then ok "G11 state偽造 → final-report が VERIFY FAILED"; else bad "G11"; fi
+
+# --- G12: プリセット採点係の定義も指紋対象 (SKILL.md 改変 → 指紋が変わる) ---------
+S=$(new_loop g12 6 90); D="$TMP/g12"
+jq '.evaluator_skill="assign-yt-script-evaluator"' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+PRESET="$P/skills/assign-yt-script-evaluator/SKILL.md"
+FP1=$(bash "$P/scripts/fingerprint.sh" "$S")
+cp "$PRESET" "$TMP/preset.bak"
+printf '\n<!-- tamper -->\n' >> "$PRESET"
+FP2=$(bash "$P/scripts/fingerprint.sh" "$S")
+cp "$TMP/preset.bak" "$PRESET"
+FP3=$(bash "$P/scripts/fingerprint.sh" "$S")
+if [ "$FP1" != "$FP2" ] && [ "$FP1" = "$FP3" ]; then ok "G12 プリセット定義の改変 → 指紋が変化 (復元で一致)"; else bad "G12"; fi
+
+# --- G13: 確認採点の省略・コピー・低スコアの封鎖 ---------------------------------
+S=$(new_loop g13 6 90); D="$TMP/g13"; T=$(jq -r '.turns_dir' "$S")
+set_anchors "$S"
+bash "$P/scripts/fingerprint.sh" "$S" --record >/dev/null
+echo "本文" > "$T/turn-000-output.md"
+write_eval "$T" 000 92 "$FB0"
+set_eval_state "$S" 0 92
+OUT=$(run_hook "$D" g13)
+R1=""; has "$(reason_of "$OUT")" "confirmation eval not found" && R1="ok"
+cp "$T/turn-000-eval.json" "$T/turn-000-eval-confirm.json"    # コピーで偽装
+jq '.eval_repair_attempts=0' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+OUT=$(run_hook "$D" g13)
+R2=""; has "$(reason_of "$OUT")" "byte-identical" && R2="ok"
+write_confirm "$T" 000 85 "$FB1"                               # 確認が threshold 未満
+jq '.eval_repair_attempts=0' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+OUT=$(run_hook "$D" g13)
+R3=""; has "$(reason_of "$OUT")" "below threshold" && R3="ok"
+if [ "$R1$R2$R3" = "okokok" ]; then ok "G13 確認採点の省略/コピー/低スコア → すべて拒否"; else bad "G13 ($R1/$R2/$R3)"; fi
+
+# --- G14: 機械NG → 実採点で復帰 (カウンタのリセット) ------------------------------
+S=$(new_loop g14 9 90); D="$TMP/g14"; T=$(jq -r '.turns_dir' "$S")
+bash "$P/scripts/fingerprint.sh" "$S" --record >/dev/null
+jq -n '{score:null, mechanical:true, quality:{overall:null, breakdown:{}}, feedback:"機械チェックNG: x", evaluator_skill:"mechanical-check"}' > "$T/turn-000-eval.json"
+echo "本文0" > "$T/turn-000-output.md"
+jq '.mech_ng=true | .latest_score=null | .phase="eval" | .evaluated_iteration=0' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+run_hook "$D" g14 >/dev/null
+echo "本文1" > "$T/turn-001-output.md"; write_eval "$T" 001 80 "$FB1"; set_eval_state "$S" 1 80
+run_hook "$D" g14 >/dev/null
+if [ "$(jq -r '.mech_ng_count' "$S")" = "0" ] && [ "$(jq -r '.iteration' "$S")" = "2" ]; then ok "G14 機械NG→実採点で復帰 (streakリセット)"; else bad "G14 (mech_count=$(jq -r '.mech_ng_count' "$S") iter=$(jq -r '.iteration' "$S"))"; fi
+
+# --- G15: loop-cancel の PASS 詐欺ガード ------------------------------------------
+S=$(new_loop g15 6 90); D="$TMP/g15"
+jq '.latest_score=85 | .evaluated_iteration=0' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+CANCEL_OUT=$(bash "$P/scripts/loop-cancel.sh" "$S" --reason passed 2>&1 || true)
+if has "$CANCEL_OUT" "WARNING" && [ "$(jq -r '.ended_reason' "$S")" = "cancelled" ]; then ok "G15 cancel の合格自称 (85<90) → cancelled に降格"; else bad "G15 (ended: $(jq -r '.ended_reason' "$S"))"; fi
+
 # --- V1-V4: validate-eval ------------------------------------------------------
 SCHEMA="$P/skills/assign-yt-script-evaluator/eval-schema.json"
 mk_script_eval() { # $1=overall $2=hook_score $3=out
@@ -207,10 +279,14 @@ jq -n --arg fb "$FB0" '{score:95, quality:{overall:95, breakdown:{a:95}}, feedba
 if ! bash "$P/scripts/validate-eval.sh" "$TMP/v3.json" - 90 "a,b" >/dev/null 2>&1; then ok "V3 軸の欠落 → 拒否"; else bad "V3"; fi
 jq -n '{score:95, quality:{overall:95, breakdown:{a:95,b:95}}, feedback:"短い", evaluator_skill:"e"}' > "$TMP/v4.json"
 if ! bash "$P/scripts/validate-eval.sh" "$TMP/v4.json" - 90 "a,b" >/dev/null 2>&1; then ok "V4 短文feedback → 拒否"; else bad "V4"; fi
+jq -n --arg fb "$FB0" '{score:85, quality:{overall:85, breakdown:{a:85,b:85}}, feedback:$fb, passed:true, evaluator_skill:"e"}' > "$TMP/v5.json"
+if ! bash "$P/scripts/validate-eval.sh" "$TMP/v5.json" - 90 "a,b" >/dev/null 2>&1; then ok "V5 passed不整合 (85<90でtrue) → 拒否"; else bad "V5"; fi
+mk_script_eval 88 88 "$TMP/v6.json"
+jq '.evaluator_skill="fake-evaluator"' "$TMP/v6.json" > "$TMP/v6b.json"
+if ! bash "$P/scripts/validate-eval.sh" "$TMP/v6b.json" "$SCHEMA" 90 >/dev/null 2>&1; then ok "V6 evaluator_skillなりすまし → 拒否"; else bad "V6"; fi
 
 # --- J1-J4: codex loop-judge -----------------------------------------------------
-JD="$TMP/judge"; mkdir -p "$JD"
-OUTI=$(bash "$CX/loop-init.sh" "t" "a,b" 90 6); RUN="${OUTI##*RUN_DIR:}"
+OUTI=$( (cd "$TMP" && bash "$CX/loop-init.sh" "t" "a,b" 90 6) ); RUN="${OUTI##*RUN_DIR:}"
 echo "本文" > "$RUN/turn-000-output.md"
 jq -n --arg fb "$FB0" '{score:85, quality:{overall:85, breakdown:{a:84,b:86}}, feedback:$fb, evaluator_skill:"codex-fresh-eval"}' > "$RUN/turn-000-eval.json"
 J1=$(bash "$CX/loop-judge.sh" "$RUN" 000)
@@ -231,4 +307,4 @@ if [ "$FAIL" -ne 0 ]; then
   echo "guard-tests: FAILED" >&2
   exit 1
 fi
-echo "guard-tests: ok (G1-G10, V1-V4, J1-J4)"
+echo "guard-tests: ok (G1-G15, V1-V6, J1-J4)"

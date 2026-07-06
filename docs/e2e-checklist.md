@@ -36,6 +36,8 @@ bash scripts/e2e-smoke.sh
 ## 3. Codex 実機
 
 ```bash
+# 初回のみ: マーケットプレイス登録 (リポジトリのパス or GitHub owner/repo)
+codex plugin marketplace add <このリポジトリのパス>
 codex plugin remove yt-quality-loop@yt-quality-loop || true
 codex plugin add yt-quality-loop@yt-quality-loop
 codex plugin list | grep yt-quality-loop

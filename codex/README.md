@@ -49,8 +49,6 @@ bash codex/install-skills.sh all          # Codex(グローバル) + Cursor/Anti
 
 | 環境 | インストール先 | 呼び出し方 |
 |---|---|---|
-| 環境 | インストール先 | 呼び出し方 |
-|---|---|---|
 | Codex CLI | `~/.agents/skills/` + `~/.codex/agents/` | `$yt-loop 台本: ○○ (threshold: 90)` |
 | Cursor | `<プロジェクト>/.cursor/skills/` + `.cursor/agents/` | 「yt-loop で台本を合格まで磨いて: ○○」 |
 | Antigravity | `<プロジェクト>/.agent/skills/` + `.agent/agents/` | 同上 |

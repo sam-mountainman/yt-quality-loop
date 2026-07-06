@@ -42,6 +42,22 @@ echo "threshold: $THRESHOLD / max: $MAX / wall: ${MAX_WALL_MINUTES}min"
 echo "criteria: $CRITERIA"
 echo ""
 
+# --- 採点アンカーの起草 (最初の生成の前に 1 回だけ。目盛りを固定して採点のブレを抑える) ---
+ANCHOR_PROMPT=$(mktemp)
+{
+  echo "あなたは採点基準の設計者です。以下の依頼と採点軸に対して、軸ごとの採点アンカー (90+/75-89/60-74/<60 の帯) を書いてください。"
+  echo "形容詞ではなく観測可能な行動の記述で書くこと (例: 90+: 冒頭3文以内に視聴者の課題か得られる結果が具体的に提示される)。"
+  echo ""
+  echo "## 依頼原文"; cat "$RUN_DIR/task.md"
+  echo ""; echo "## 採点軸"; echo "$CRITERIA"
+  echo ""; echo "## 出力: 上記アンカーを $RUN_DIR/criteria-anchors.md に書き込むこと。それ以外のファイルは作らない。"
+} > "$ANCHOR_PROMPT"
+echo "[setup] drafting criteria anchors..."
+"$CODEX_BIN" exec --full-auto -C "$RUN_DIR" ${CODEX_MODEL:+-m "$CODEX_MODEL"} - < "$ANCHOR_PROMPT" || true
+rm -f "$ANCHOR_PROMPT"
+[ -s "$RUN_DIR/criteria-anchors.md" ] && echo "[setup] anchors: $RUN_DIR/criteria-anchors.md" || echo "[setup] WARN: anchors not drafted — 採点のブレが増える可能性"
+echo ""
+
 BEST_SCORE=-1
 BEST_ITER=""
 FEEDBACK=""

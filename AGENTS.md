@@ -30,3 +30,19 @@
 
 - Codex CLI 0.132.0: exec / 対話とも plugin hook は発火しない (実測)。`$yt-loop-hook` は plugin root 不在を検知して `$yt-loop` にフォールバックする — この縮退を壊さない
 - Node 20+ が必要な CLI (claude 等) を呼ぶスクリプトは、古い node が PATH 先頭の環境を考慮する (validate-packages.sh の Node ガード参照)
+
+## 二重正本の方針 (Claude 版 と スキル環境版)
+
+ループのオーケストレーション手順は 2 系統ある:
+
+- `plugins/yt-quality-loop/skills/yt-loop/SKILL.md` (Claude Code。Stop hook 前提)
+- `codex/skills/yt-loop{,-hook}/SKILL.md` (Codex/Cursor/Antigravity。yt-loop-hook は Codex hook 前提)
+
+**機能を片方に足したら、もう片方へ移植するか「意図的な差分」として AGENTS.md に記録するか、必ずどちらかを行う** (v1.5 で hook 版に brief/anchors の配線漏れが起き、指紋防御が片系統だけ欠落した — この事故の再発防止)。現在の意図的な差分: なし (機能は両系統で同等)。
+
+## テストの使い分け
+
+- `bash scripts/guard-tests.sh` — グッドハート対策ガードの挙動 (G/V/J)。**ループ制御スクリプトを触ったら必須**
+- `bash scripts/e2e-smoke.sh` — 引数なしで **plugins/ (正本) と codex-plugin/ (同期コピー) の両方** に対して状態遷移+final-report を検証し、最後に guard-tests も回す。**リリース前はこれ 1 本でよい**
+- `bash scripts/validate-packages.sh` — 静的検証 (構文 / JSON / manifest / claude plugin validate)
+- guard-tests は /tmp 配下で完結する (リポジトリに残骸を残さない)
