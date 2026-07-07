@@ -1,6 +1,6 @@
 {
   "name": "yt-quality-loop",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "description": "YouTube向け成果物 (台本 / ショート / タイトル・サムネ案) を、品質スコアが合格点に達するまで自動改善ループで磨き込むプラグイン。作る係 (generator) と採点する係 (evaluator) を分離し、続行判定はシェルの整数比較 (Stop hook) が行う。",
   "author": {
     "name": "Masa",

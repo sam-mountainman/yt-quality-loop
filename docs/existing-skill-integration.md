@@ -10,6 +10,26 @@
 /yt-loop 台本: 新NISAの解説 10分 (generator: my-script-skill)
 ```
 
+ただし、毎回書く必要はありません。`/yt-import-skill` を一度実行すると、既定 generator が `.yt-loop/defaults.json` に保存されます。以後は普通に:
+
+```text
+/yt-loop 台本: 新NISAの解説 10分
+```
+
+だけで、その generator が自動で使われます。
+
+今回だけ別の generator を使う時:
+
+```text
+/yt-loop 台本: 新NISAの解説 10分 (generator: other-script-skill)
+```
+
+今回だけ標準 generator に戻す時:
+
+```text
+/yt-loop 台本: 新NISAの解説 10分 (generator: assign-yt-generator)
+```
+
 この時の分担:
 
 - `my-script-skill`: 台本を書く

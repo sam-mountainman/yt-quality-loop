@@ -33,6 +33,13 @@
 - Codex / Cursor / Antigravity の manifest 参照を PNG に更新
 - `assets/NOTICE.md` を生成画像アイコン向けの説明に更新
 
+## v1.6.4 の追加 (既存台本スキルの既定 generator 化)
+
+- `/yt-import-skill` が `.yt-loop/defaults.json` に `default_generator` を保存するように変更
+- `/yt-loop` は `generator:` 明示が無い場合、`.yt-loop/defaults.json` の既定 generator を自動採用するように手順を更新
+- `/yt-doctor` に既定 generator の検出表示を追加
+- README / 既存スキル統合ドキュメントに「毎回 `(generator: ...)` は不要」と明記
+
 ## v1.2 の修正 (Claude Code 前提からの脱却)
 
 **誤っていた前提の修正:**

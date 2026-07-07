@@ -173,6 +173,14 @@ claude plugin install yt-quality-loop@yt-quality-loop --scope project
 
 あなたのスキルが書き、ループの採点係が検品し、不合格なら直し方付きで差し戻されます。スキル＝専門知識の移植、ループ＝合格までの収束。スキルはループの部品として生き続けます。スキルに書き込んだこだわり・基準の記述は、`/yt-profile` に渡せばプロファイルへ移植もできます。
 
+毎回 `(generator: my-script-skill)` と書く必要はありません。`/yt-import-skill` で取り込むと `.yt-loop/defaults.json` に既定 generator として保存されます。以後は:
+
+```
+/yt-loop 台本: 新NISAの解説 10分
+```
+
+だけで、その generator が自動で使われます。今回だけ変えたい時だけ `(generator: 別名)`、標準に戻したい時だけ `(generator: assign-yt-generator)` と書きます。
+
 既存スキルを整理してから使う場合:
 
 ```

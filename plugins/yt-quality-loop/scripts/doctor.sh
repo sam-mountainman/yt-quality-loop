@@ -34,6 +34,18 @@ else
   echo "△ チャンネルプロファイル: 未作成 (/yt-profile で作ると台本の採点に「らしさ」が入る)"
 fi
 
+# 既定 generator (任意)
+if [ -f "$CWD/.yt-loop/defaults.json" ]; then
+  DEFAULT_GENERATOR=$(jq -r '.default_generator // empty' "$CWD/.yt-loop/defaults.json" 2>/dev/null || true)
+  if [ -n "$DEFAULT_GENERATOR" ]; then
+    echo "○ 既定 generator: $DEFAULT_GENERATOR (.yt-loop/defaults.json)"
+  else
+    echo "△ 既定 generator: defaults.json はありますが default_generator が空です"
+  fi
+else
+  echo "△ 既定 generator: 未設定 (/yt-import-skill で既存台本スキルを登録できます)"
+fi
+
 # 機械チェックルール (任意)
 if [ -f "$CWD/.yt-loop/mechanical-checks.json" ]; then
   if command -v jq &>/dev/null && jq -e . "$CWD/.yt-loop/mechanical-checks.json" >/dev/null 2>&1; then
@@ -59,7 +71,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if command -v jq &>/dev/null && [ -f "$SCRIPT_DIR/validate-eval.sh" ]; then
   TMP=$(mktemp)
-  echo '{"score":91,"quality":{"overall":91,"breakdown":{"test":91}},"feedback":"ok","passed":true,"evaluator_skill":"selftest"}' > "$TMP"
+  echo '{"score":91,"quality":{"overall":91,"breakdown":{"test":91}},"feedback":"自己テスト用の十分な長さのfeedbackです。validate-eval.shが文字数条件とJSON契約を正しく通せるか確認します。","passed":true,"evaluator_skill":"selftest"}' > "$TMP"
   if bash "$SCRIPT_DIR/validate-eval.sh" "$TMP" - 90 >/dev/null 2>&1; then
     echo "○ 採点検証スクリプト (validate-eval.sh): 動作OK"
   else

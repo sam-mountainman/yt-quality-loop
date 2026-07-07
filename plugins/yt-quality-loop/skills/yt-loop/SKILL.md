@@ -24,7 +24,15 @@ allowed-tools: "*"
 | **max_wall** | 120 (分) | 時間の上限 |
 | **criteria** | evaluator 準拠 | 採点軸 (カンマ区切り、自由指定時のみ) |
 | **evaluator** | 自動選択 | 採点する係の skill 名 (明示指定も可) |
-| **generator** | assign-yt-generator | 作る係の skill 名。**ユーザーの既存の台本スキル名を指定できる** (例: `generator: my-script-skill`)。既存スキルはそのまま「作る係」の席に座り、採点と差し戻しはループが行う |
+| **generator** | `.yt-loop/defaults.json` の `default_generator`、無ければ `assign-yt-generator` | 作る係の skill 名。**ユーザーの既存の台本スキル名を指定できる** (例: `generator: my-script-skill`)。既存スキルはそのまま「作る係」の席に座り、採点と差し戻しはループが行う |
+
+**既定 generator の検出**: ユーザーが `generator:` を明示しない場合、`.yt-loop/defaults.json` を読む。`default_generator` が non-empty ならそれを generator として使う。これにより、既存台本スキルを毎回 `(generator: ...)` と書く必要はない。
+
+```bash
+[ -f .yt-loop/defaults.json ] && jq -r '.default_generator // empty' .yt-loop/defaults.json || true
+```
+
+明示された `generator:` は常に defaults より優先する。今回だけ標準 generator に戻したい場合は `generator: assign-yt-generator` と指定する。ループ開始宣言には、既定 generator を使った場合も `作る係: <generator> (既定)` と出す。
 
 **カスタム generator の red-flag 検査**: `generator:` が非デフォルトの場合、ループ開始前にそのスキルの SKILL.md 原本を grep で検査する:
 
@@ -112,7 +120,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" "<STATE_FILE>" --record
 
 最後に、ループを回し始める前にユーザーへ見通しを伝える (その後すぐ Step 3 のツール呼び出しへ進む — テキストだけで応答を終えない):
 
-> ループ開始: 最大 <max> 周 / 合格点 <threshold> / 時間上限 <max_wall> 分。**採点係: <evaluator 名> (軸: <criteria>)** — 軸を変えるには `criteria:` 指定、チャンネル固有にするには /yt-profile。
+> ループ開始: 最大 <max> 周 / 合格点 <threshold> / 時間上限 <max_wall> 分。**作る係: <generator 名>{既定なら " (既定)"} / 採点係: <evaluator 名> (軸: <criteria>)** — 軸を変えるには `criteria:` 指定、チャンネル固有にするには /yt-profile。
 > {ブリーフを作った場合: ブリーフ: <パス> — 約束する変化「<1行要約>」/ 絶対言わない話「<1行要約>」}
 > {アンカーを起草した場合: 採点アンカー: <パス> (90点の目盛りはこのファイルで確認できます)}
 > 1 周の目安は 10〜25 分 (プロファイル付き台本は長め)、多くは 2〜4 周で収束します。途中で止める: /yt-loop-cancel。ベスト版は必ず納品します。
