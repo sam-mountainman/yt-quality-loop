@@ -34,16 +34,26 @@ else
   echo "△ チャンネルプロファイル: 未作成 (/yt-profile で作ると台本の採点に「らしさ」が入る)"
 fi
 
-# 既定 generator (任意)
+# 既存台本スキルの候補 (任意)
+if [ -d "$CWD/.yt-loop/imported-generators" ]; then
+  IMPORTED_COUNT=$(find "$CWD/.yt-loop/imported-generators" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$IMPORTED_COUNT" -gt 0 ]; then
+    echo "○ 登録済み台本スキル候補: ${IMPORTED_COUNT}件 (使う時は /yt-loop ... skill: <名前>)"
+  else
+    echo "△ 登録済み台本スキル候補: なし (/yt-import-skill で整理できます)"
+  fi
+else
+  echo "△ 登録済み台本スキル候補: なし (/yt-import-skill で整理できます)"
+fi
+
+# v1.6.4 の旧既定 generator (互換診断のみ。自動採用はしない)
 if [ -f "$CWD/.yt-loop/defaults.json" ]; then
   DEFAULT_GENERATOR=$(jq -r '.default_generator // empty' "$CWD/.yt-loop/defaults.json" 2>/dev/null || true)
   if [ -n "$DEFAULT_GENERATOR" ]; then
-    echo "○ 既定 generator: $DEFAULT_GENERATOR (.yt-loop/defaults.json)"
+    echo "△ 旧既定 generator: $DEFAULT_GENERATOR (.yt-loop/defaults.json は自動採用しません。使う時は skill: $DEFAULT_GENERATOR)"
   else
-    echo "△ 既定 generator: defaults.json はありますが default_generator が空です"
+    echo "△ 旧既定 generator: defaults.json はありますが default_generator が空です"
   fi
-else
-  echo "△ 既定 generator: 未設定 (/yt-import-skill で既存台本スキルを登録できます)"
 fi
 
 # 機械チェックルール (任意)

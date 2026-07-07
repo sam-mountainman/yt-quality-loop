@@ -168,18 +168,19 @@ claude plugin install yt-quality-loop@yt-quality-loop --scope project
 そのスキルは捨てません。**「作る係」の席にそのまま差し込めます**:
 
 ```
-/yt-loop 台本: 新NISAの解説 10分 (generator: my-script-skill)
+/yt-loop 台本: 新NISAの解説 10分 (skill: my-script-skill)
 ```
 
 あなたのスキルが書き、ループの採点係が検品し、不合格なら直し方付きで差し戻されます。スキル＝専門知識の移植、ループ＝合格までの収束。スキルはループの部品として生き続けます。スキルに書き込んだこだわり・基準の記述は、`/yt-profile` に渡せばプロファイルへ移植もできます。
 
-毎回 `(generator: my-script-skill)` と書く必要はありません。`/yt-import-skill` で取り込むと `.yt-loop/defaults.json` に既定 generator として保存されます。以後は:
+1 つのチャンネルでも、長尺解説用・ショート用・セールス用・慎重解説用など複数の台本スキルを使い分けることがあります。そのため、`/yt-import-skill` は勝手に既定スキルを設定しません。使う時に **`skill:` で明示**します。
 
 ```
-/yt-loop 台本: 新NISAの解説 10分
+/yt-loop ショート台本: 新NISAの落とし穴を60秒で (skill: shorts-hook)
+/yt-loop 台本: 新NISAの解説 10分 (skill: long-explain)
 ```
 
-だけで、その generator が自動で使われます。今回だけ変えたい時だけ `(generator: 別名)`、標準に戻したい時だけ `(generator: assign-yt-generator)` と書きます。
+旧表記の `generator:` も互換用に使えますが、運営者向けの説明では `skill:` を推奨します。何も指定しなければ標準の作る係を使います。標準に戻したい時は `skill: assign-yt-generator` と書きます。
 
 既存スキルを整理してから使う場合:
 
@@ -187,7 +188,7 @@ claude plugin install yt-quality-loop@yt-quality-loop --scope project
 /yt-import-skill path/to/my-script-skill/SKILL.md
 ```
 
-移植メモは `.yt-loop/imported-generators/` に保存され、`generator:` に指定する名前、プロファイルへ移すべきルール、除外すべき危険指示が分かれます。詳しくは [docs/existing-skill-integration.md](docs/existing-skill-integration.md)。
+移植メモは `.yt-loop/imported-generators/` に保存され、`skill:` に指定する名前、プロファイルへ移すべきルール、除外すべき危険指示が分かれます。詳しくは [docs/existing-skill-integration.md](docs/existing-skill-integration.md)。
 
 ### Codex / Cursor / Antigravity 対応の確認
 

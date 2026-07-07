@@ -8,7 +8,7 @@ allowed-tools: "*"
 
 # YT Import Skill
 
-既存の台本スキルを捨てずに、`yt-quality-loop` の作る係として使えるように整理します。目的は、既存スキルのノウハウを **generator の契約** と **チャンネルプロファイル** に分けることです。
+既存の台本スキルを捨てずに、`yt-quality-loop` の作る係として使えるように整理します。目的は、既存スキルのノウハウを **作る係の候補** と **チャンネルプロファイル** に分けることです。
 
 ## Step 1: 入力確認
 
@@ -61,26 +61,16 @@ mkdir -p .yt-loop
 
 ## yt-loop での使い方
 
-`/yt-loop 台本: ... (generator: <skill-name>)`
+`/yt-loop 台本: ... (skill: <skill-name>)`
 
 ## 出力契約
 
 完成版の全文を `<artifact_file>` に書き込む。それ以外のファイルは触らない。前回版があれば、それを土台に指定された修正だけを反映する。
 ```
 
-続けて、同じ generator を毎回 `generator:` 指定しなくてよいように `.yt-loop/defaults.json` を保存する。既存ファイルがある場合は `default_generator` と `default_generator_source` だけを更新し、他のキーは残す:
+`/yt-import-skill` は、取り込んだスキルを勝手に既定 generator へ設定しない。1 チャンネル内でも長尺・ショート・セールス・慎重解説など複数の台本スキルを使い分けるため、どの作る係を使うかは `/yt-loop ... (skill: <skill-name>)` で毎回明示する。
 
-```bash
-if [ -f .yt-loop/defaults.json ]; then
-  jq --arg gen "<skill-name>" --arg source "<元ファイルパス>" \
-     '.default_generator=$gen | .default_generator_source=$source' \
-     .yt-loop/defaults.json > .yt-loop/defaults.json.tmp && mv .yt-loop/defaults.json.tmp .yt-loop/defaults.json
-else
-  jq -n --arg gen "<skill-name>" --arg source "<元ファイルパス>" \
-     '{default_generator:$gen, default_generator_source:$source}' \
-     > .yt-loop/defaults.json
-fi
-```
+互換のため `/yt-loop ... (generator: <skill-name>)` も使えるが、運営者向けの案内では `skill:` を使う。
 
 ## Step 4: プロファイルへ反映
 
@@ -91,8 +81,8 @@ fi
 最後に以下を短く報告する。
 
 - 移植メモのパス
-- 既定 generator に設定した名前 (`.yt-loop/defaults.json`)
-- 今後は `/yt-loop 台本: ...` だけでその generator が使われること。今回だけ変える時は `(generator: 別名)`、標準に戻す時は `(generator: assign-yt-generator)`
+- 使う時に指定する名前 (`skill: <skill-name>`)
+- 今後の使い方: `/yt-loop 台本: ... (skill: <skill-name>)`。標準に戻す時は `skill: assign-yt-generator`
 - profile に反映した項目
 - 危険として除外した項目
 

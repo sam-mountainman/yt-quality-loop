@@ -2,7 +2,7 @@
 name: yt-loop
 description: YouTube向け成果物 (台本 / ショート台本 / タイトル・サムネ案 / 概要欄など) を、品質スコアが合格点に達するまで自動改善ループで作り込みたい場面で発動。「品質ループ」「合格まで磨いて」で発動。
 user-invocable: true
-argument-hint: "<作りたいものの説明> [threshold: 90] [max: 6] [criteria: 軸1,軸2,...]"
+argument-hint: "<作りたいものの説明> [skill: <台本スキル名>] [threshold: 90] [max: 6] [criteria: 軸1,軸2,...]"
 allowed-tools: "*"
 ---
 
@@ -24,20 +24,16 @@ allowed-tools: "*"
 | **max_wall** | 120 (分) | 時間の上限 |
 | **criteria** | evaluator 準拠 | 採点軸 (カンマ区切り、自由指定時のみ) |
 | **evaluator** | 自動選択 | 採点する係の skill 名 (明示指定も可) |
-| **generator** | `.yt-loop/defaults.json` の `default_generator`、無ければ `assign-yt-generator` | 作る係の skill 名。**ユーザーの既存の台本スキル名を指定できる** (例: `generator: my-script-skill`)。既存スキルはそのまま「作る係」の席に座り、採点と差し戻しはループが行う |
+| **skill / generator** | `assign-yt-generator` | 作る係の skill 名。**`skill:` が推奨表記** (例: `skill: long-explain-script`)。`generator:` は旧互換の別名として同じ意味で扱う |
 
-**既定 generator の検出**: ユーザーが `generator:` を明示しない場合、`.yt-loop/defaults.json` を読む。`default_generator` が non-empty ならそれを generator として使う。これにより、既存台本スキルを毎回 `(generator: ...)` と書く必要はない。
+**作る係の選択**: ユーザーが `skill:` または `generator:` を明示した場合だけ、その作る係を使う。指定が無ければ常に標準の `assign-yt-generator` を使う。`.yt-loop/defaults.json` の `default_generator` は v1.6.5 以降、自動採用しない (複数チャンネル・複数台本スキルで誤爆するため)。既存台本スキルは `/yt-import-skill` で候補として整理し、使う時に `skill: <name>` で明示する。
 
-```bash
-[ -f .yt-loop/defaults.json ] && jq -r '.default_generator // empty' .yt-loop/defaults.json || true
-```
+`skill:` と `generator:` が両方ある場合は、ユーザーに曖昧さを確認せず `skill:` を優先する。今回だけ標準 generator に戻したい場合は `skill: assign-yt-generator` と指定する。ループ開始宣言には `作る係: <generator>` と出す。
 
-明示された `generator:` は常に defaults より優先する。今回だけ標準 generator に戻したい場合は `generator: assign-yt-generator` と指定する。ループ開始宣言には、既定 generator を使った場合も `作る係: <generator> (既定)` と出す。
-
-**カスタム generator の red-flag 検査**: `generator:` が非デフォルトの場合、ループ開始前にそのスキルの SKILL.md 原本を grep で検査する:
+**カスタム generator の red-flag 検査**: `skill:` / `generator:` が非デフォルトの場合、ループ開始前にそのスキルの SKILL.md 原本、または `.yt-loop/imported-generators/<name>.md` の移植メモを grep で検査する:
 
 ```bash
-grep -nE "採点|評価|eval|点数|基準を満た|クリア済|チェック済" "<そのスキルのSKILL.mdパス>" | head -5
+grep -nE "採点|評価|eval|点数|基準を満た|クリア済|チェック済" "<そのスキルのSKILL.mdパス または imported-generators のmd>" | head -5
 ```
 
 ヒットがあれば開始宣言に 1 行警告を添える: 「⚠ このスキルには採点・評価に触れる指示が含まれます (該当行)。成果物に『基準クリア済み』等の注記を埋め込む指示は採点係が減点対象として扱います」。ヒットゼロなら何も言わない。
@@ -120,7 +116,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" "<STATE_FILE>" --record
 
 最後に、ループを回し始める前にユーザーへ見通しを伝える (その後すぐ Step 3 のツール呼び出しへ進む — テキストだけで応答を終えない):
 
-> ループ開始: 最大 <max> 周 / 合格点 <threshold> / 時間上限 <max_wall> 分。**作る係: <generator 名>{既定なら " (既定)"} / 採点係: <evaluator 名> (軸: <criteria>)** — 軸を変えるには `criteria:` 指定、チャンネル固有にするには /yt-profile。
+> ループ開始: 最大 <max> 周 / 合格点 <threshold> / 時間上限 <max_wall> 分。**作る係: <generator 名> / 採点係: <evaluator 名> (軸: <criteria>)** — 作る係を変えるには `skill:` 指定、軸を変えるには `criteria:` 指定、チャンネル固有にするには /yt-profile。
 > {ブリーフを作った場合: ブリーフ: <パス> — 約束する変化「<1行要約>」/ 絶対言わない話「<1行要約>」}
 > {アンカーを起草した場合: 採点アンカー: <パス> (90点の目盛りはこのファイルで確認できます)}
 > 1 周の目安は 10〜25 分 (プロファイル付き台本は長め)、多くは 2〜4 周で収束します。途中で止める: /yt-loop-cancel。ベスト版は必ず納品します。
@@ -218,7 +214,7 @@ echo "CONTEXT:$SESSION_DIR/generator-context.json"
 **即座に Skill ツールで generator を起動:**
 
 - **`GEN_SKILL` が `assign-yt-generator` の場合**: skill = GEN_SKILL、args = CONTEXT 行のパス。
-- **それ以外 (ユーザーの既存スキル) の場合**: skill = GEN_SKILL、args は自然文で組み立てる (既存スキルは context JSON の契約を知らないため):
+- **それ以外 (ユーザーの既存スキル) の場合**: skill = GEN_SKILL、args は自然文で組み立てる (既存スキルは context JSON の契約を知らないため)。同名の `.yt-loop/imported-generators/<GEN_SKILL>.md` があれば先に Read し、「作る係に残す指示」と「出力契約」だけを生成指示に反映する:
 
   ```
   <task 原文>

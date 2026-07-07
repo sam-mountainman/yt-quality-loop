@@ -7,27 +7,29 @@
 ## 使い方
 
 ```text
-/yt-loop 台本: 新NISAの解説 10分 (generator: my-script-skill)
+/yt-loop 台本: 新NISAの解説 10分 (skill: my-script-skill)
 ```
 
-ただし、毎回書く必要はありません。`/yt-import-skill` を一度実行すると、既定 generator が `.yt-loop/defaults.json` に保存されます。以後は普通に:
+`skill:` は、その回で使う「作る係」を選ぶ指定です。1 つのチャンネルでも、長尺解説・ショート・セールス・慎重解説・物語調など、用途ごとに別の台本スキルを使うことがあります。そのため、`/yt-import-skill` は勝手に既定スキルを設定しません。
+
+用途ごとに明示して使います。
 
 ```text
-/yt-loop 台本: 新NISAの解説 10分
+/yt-loop 台本: 新NISAの解説 10分 (skill: long-explain)
+/yt-loop ショート台本: 新NISAの落とし穴を60秒で (skill: shorts-hook)
+/yt-loop 販売導線つき台本: 講座案内につなげる (skill: sales-script)
 ```
 
-だけで、その generator が自動で使われます。
-
-今回だけ別の generator を使う時:
+旧表記の `generator:` も互換用に使えます。
 
 ```text
 /yt-loop 台本: 新NISAの解説 10分 (generator: other-script-skill)
 ```
 
-今回だけ標準 generator に戻す時:
+標準 generator に戻す時:
 
 ```text
-/yt-loop 台本: 新NISAの解説 10分 (generator: assign-yt-generator)
+/yt-loop 台本: 新NISAの解説 10分 (skill: assign-yt-generator)
 ```
 
 この時の分担:

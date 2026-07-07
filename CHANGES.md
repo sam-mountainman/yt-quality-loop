@@ -33,7 +33,15 @@
 - Codex / Cursor / Antigravity の manifest 参照を PNG に更新
 - `assets/NOTICE.md` を生成画像アイコン向けの説明に更新
 
-## v1.6.4 の追加 (既存台本スキルの既定 generator 化)
+## v1.6.5 の変更 (台本スキルは明示選択に戻す)
+
+- `/yt-import-skill` が `.yt-loop/defaults.json` を自動更新しないように変更。取り込んだ既存台本スキルは「候補」として `.yt-loop/imported-generators/` に整理するだけにした
+- `/yt-loop` は `skill:` を作る係の推奨指定に変更。`generator:` は旧互換の別名として残す
+- `.yt-loop/defaults.json` の `default_generator` は自動採用しない。1 つのチャンネルでも長尺・ショート・セールス・慎重解説など複数の台本スキルを使うため、暗黙の 1 つに寄せると誤爆しやすい
+- `/yt-doctor` は登録済み台本スキル候補の件数を表示し、旧 `default_generator` が残っている場合は「自動採用しない」と警告する
+- README / 既存スキル統合ドキュメントを `skill:` 明示方式に更新
+
+## v1.6.4 の追加 (既存台本スキルの既定 generator 化 — v1.6.5 で自動採用を停止)
 
 - `/yt-import-skill` が `.yt-loop/defaults.json` に `default_generator` を保存するように変更
 - `/yt-loop` は `generator:` 明示が無い場合、`.yt-loop/defaults.json` の既定 generator を自動採用するように手順を更新
@@ -201,7 +209,7 @@ loop-start.sh は 70、記事・運用は 90 だった。
 ## 追加機能 (元コードに無いもの)
 
 - **チャンネルプロファイル機構** (`/yt-profile` + `assign-yt-channel-evaluator`): らしさのものさし化と納品後の直しの還流
-- **既存スキルの差し込み口** (`generator:` 指定): ユーザーが既に持つ台本スキルをそのまま「作る係」として使える (出力契約の検収付き)
+- **既存スキルの差し込み口** (`skill:` / 旧互換 `generator:` 指定): ユーザーが既に持つ台本スキルをそのまま「作る係」として使える (出力契約の検収付き)
 - **機械チェック** (`check-mechanical.sh` + `.yt-loop/mechanical-checks.json`): 文字数・禁止ワード・文末連続を採点前にスクリプトで○×判定。NG なら採点なしで差し戻し
 - **進捗ゼロ検知**: 2 回連続でスコアが上がらなければ自動停止 (`ended_reason: no_progress`)。Claude Code 版 / スキル環境版の両方
 - **セットアップ診断** (`/yt-doctor` + `doctor.sh`)
