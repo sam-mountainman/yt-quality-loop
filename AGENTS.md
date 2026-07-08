@@ -6,7 +6,7 @@
 
 1. **スキルの正本は `codex/skills/yt-loop/`** (Codex/Cursor/Antigravity 共通)。ここを変えたら必ず `bash sync-packages.sh` で codex-plugin / cursor-plugin / antigravity-plugin に同期する。パッケージ側を直接編集しない (次の sync で消える)
 2. **Claude Code プラグインの正本は `plugins/yt-quality-loop/`**。scripts は sync-packages が codex-plugin/scripts にも同期する
-3. **`loop-control.sh` / `validate-eval.sh` / `fingerprint.sh` / `loop-judge.sh` / `check-mechanical.sh` を触ったら、必ず `bash scripts/guard-tests.sh` を通す** (グッドハート対策ガード G1-G10 + V + J のレグレッション)。落ちる変更はマージしない
+3. **`loop-control.sh` / `validate-eval.sh` / `fingerprint.sh` / `loop-judge.sh` / `check-mechanical.sh` / `yt-loop.js` を触ったら、必ず `bash scripts/guard-tests.sh` と `node scripts/e2e-smoke-node.js` を通す** (グッドハート対策ガード G/V/J と Windows ネイティブ制御プレーンのレグレッション)。落ちる変更はマージしない
 4. リリース前の一括検証: `bash scripts/validate-packages.sh && bash scripts/e2e-smoke.sh`
 5. バージョン更新は `bash bump-version.sh <x.y.z>` (7 ファイルに散在する version を一括更新) → sync-packages → zip 再生成
 
@@ -30,6 +30,7 @@
 
 - Codex CLI 0.132.0: exec / 対話とも plugin hook は発火しない (実測)。`$yt-loop-hook` は plugin root 不在を検知して `$yt-loop` にフォールバックする — この縮退を壊さない
 - Node 20+ が必要な CLI (claude 等) を呼ぶスクリプトは、古い node が PATH 先頭の環境を考慮する (validate-packages.sh の Node ガード参照)
+- Windows ネイティブでは Bash/jq ではなく `plugins/yt-quality-loop/scripts/yt-loop.js` が hook / state / eval / final-report の制御プレーンになる。Bash scripts は macOS/Linux/WSL 互換経路として残すが、hook command は Node 経由を正とする
 
 ## 他エージェント仕様の扱い
 
@@ -44,11 +45,12 @@
 - `plugins/yt-quality-loop/skills/yt-loop/SKILL.md` (Claude Code。Stop hook 前提)
 - `codex/skills/yt-loop{,-hook}/SKILL.md` (Codex/Cursor/Antigravity。yt-loop-hook は Codex hook 前提)
 
-**機能を片方に足したら、もう片方へ移植するか「意図的な差分」として AGENTS.md に記録するか、必ずどちらかを行う** (v1.5 で hook 版に brief/anchors の配線漏れが起き、指紋防御が片系統だけ欠落した — この事故の再発防止)。現在の意図的な差分: なし (機能は両系統で同等)。
+**機能を片方に足したら、もう片方へ移植するか「意図的な差分」として AGENTS.md に記録するか、必ずどちらかを行う** (v1.5 で hook 版に brief/anchors の配線漏れが起き、指紋防御が片系統だけ欠落した — この事故の再発防止)。現在の意図的な差分: `yt-loop.js` は Claude/Codex hook 制御プレーンの正本で、hook なし `$yt-loop` / `codex/yt-loop-runner.sh` は従来どおり Bash 互換経路。
 
 ## テストの使い分け
 
 - `bash scripts/guard-tests.sh` — グッドハート対策ガードの挙動 (G/V/J)。**ループ制御スクリプトを触ったら必須**
-- `bash scripts/e2e-smoke.sh` — 引数なしで **plugins/ (正本) と codex-plugin/ (同期コピー) の両方** に対して状態遷移+final-report を検証し、最後に guard-tests も回す。**リリース前はこれ 1 本でよい**
+- `bash scripts/e2e-smoke.sh` — 引数なしで **plugins/ (正本) と codex-plugin/ (同期コピー) の両方** に対して状態遷移+final-report を検証し、Node E2E と guard-tests も回す。**リリース前はこれ 1 本でよい**
+- `node scripts/e2e-smoke-node.js` — Bash/jq 無しの Windows ネイティブ制御プレーンだけを高速検証する
 - `bash scripts/validate-packages.sh` — 静的検証 (構文 / JSON / manifest / claude plugin validate)
 - guard-tests は /tmp 配下で完結する (リポジトリに残骸を残さない)

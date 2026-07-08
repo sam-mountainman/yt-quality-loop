@@ -23,6 +23,9 @@ fi
 echo "== shell syntax =="
 find . -name '*.sh' -type f -not -path './.git/*' -print0 | xargs -0 -n1 bash -n
 
+echo "== node syntax =="
+find . -name '*.js' -type f -not -path './.git/*' -print0 | xargs -0 -n1 node --check
+
 echo "== json syntax =="
 find . -name '*.json' -type f -not -path './.git/*' -print0 | xargs -0 -n1 jq empty
 
@@ -88,7 +91,11 @@ for (const file of [
 NODE
 
 echo "== claude plugin =="
-claude plugin validate plugins/yt-quality-loop --strict
+if command -v claude >/dev/null 2>&1; then
+  claude plugin validate plugins/yt-quality-loop --strict
+else
+  echo "SKIP: claude CLI not found"
+fi
 
 echo "== gemini extension compatibility =="
 if command -v gemini >/dev/null 2>&1; then

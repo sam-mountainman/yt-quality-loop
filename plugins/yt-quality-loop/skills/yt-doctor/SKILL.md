@@ -21,11 +21,19 @@ allowed-tools: Bash, Read
 
 ## Step 2: 環境診断スクリプトの実行
 
+まず Node 制御プレーンを確認する (Windows ネイティブではこちらが本線):
+
+```bash
+node ${CLAUDE_PLUGIN_ROOT}/scripts/yt-loop.js platform-doctor
+```
+
+次に Bash 互換経路も確認する (macOS / Linux / WSL ではこちらも使える):
+
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/doctor.sh .
 ```
 
-出力をそのままユーザーに見せる。
+出力をそのままユーザーに見せる。Windows ネイティブで Bash が無い場合、Bash 側の失敗は「互換経路が無い」という意味であり、Node 側が OK なら制御プレーンは動く。
 
 ## Step 3: 結果の案内
 

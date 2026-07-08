@@ -13,6 +13,14 @@
 | 対象ユーザー | エンジニア (自分用) | **非エンジニアの YouTube 運営者** |
 | Codex 対応 | evaluator の一部として利用 | **スキル + 無人ランナーとして全面対応** |
 
+## v1.6.6 の追加 (Windows ネイティブ制御プレーン)
+
+- `plugins/yt-quality-loop/scripts/yt-loop.js` を追加。Bash / jq / mktemp / stat / shasum に依存せず、loop start、Stop hook 判定、UserPromptSubmit 注入、eval 検証、機械チェック、指紋、final report、cancel、fresh marker、state 更新を Node だけで実行できる
+- Claude / Codex の hook command を `bash ...hook-stop.sh` から `node -e "...yt-loop.js..."` に変更。シェルの `${VAR}` 展開ではなく Node が `PLUGIN_ROOT` / `CLAUDE_PLUGIN_ROOT` を読むため、Windows cmd / PowerShell でも壊れにくい
+- `scripts/e2e-smoke-node.js` を追加。Windows ネイティブ相当の Node 経路で `loop-start -> state-config -> fingerprint -> eval -> hook-stop threshold_met -> final-report -> hook-prompt-submit` を決定論的に検証する
+- `scripts/validate-packages.sh` に Node syntax check を追加し、`scripts/e2e-smoke.sh` から Node E2E も呼ぶようにした
+- README / 互換表 / E2E チェックリストを更新。macOS/Linux/WSL は Bash 互換経路も維持、Windows ネイティブは Node 制御プレーン対応。ただし各GUIホストがWindowsでプラグインを実際にロードするかは別途実機確認として扱う
+
 ## v1.6.1 の追加 (他エージェント互換性の記憶依存を排除)
 
 - `docs/agent-compat-matrix.md` を追加。Claude Code / Codex / Cursor / Antigravity について、plugin・skill・hook・subagent の扱い、公式 docs、実機検証の有無を 1 表で管理する
@@ -237,7 +245,7 @@ loop-start.sh は 70、記事・運用は 90 だった。
 
 ## 既知の制限
 
-- hooks は bash 前提。Windows ネイティブは未対応 (WSL を使う)
+- hooks の制御プレーンは v1.6.6 で Node 化し、Windows ネイティブでも Bash/jq 無しで動く。ただし各ホストGUIがWindowsでプラグインを読み込むかは実機確認が必要
 - Codex は `$yt-loop-hook` で Stop hook 駆動に対応済み。ただし plugin hooks はユーザーが信頼するまで実行されないため、信頼していない環境では `$yt-loop` または `yt-loop-runner.sh` を使う
 - Antigravity パッケージは `plugin.json` + skills + agents の構造まで整備済みだが、このマシンに `agy` が無いため実機インストール検証は未実施
 - 採点は LLM 評価である以上 ±3-5 点のブレがある。1-2 点差は誤差として扱い、threshold は「その誤差込みで越えてほしい線」に置くこと

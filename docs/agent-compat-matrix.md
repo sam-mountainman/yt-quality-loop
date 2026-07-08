@@ -1,6 +1,6 @@
 # Agent Compatibility Matrix
 
-Last checked: 2026-07-07
+Last checked: 2026-07-08
 
 This document is the source of truth for what this repository assumes about Claude Code, Codex, Cursor, and Antigravity. Do not rely on an AI agent's memory when changing cross-agent packaging. Check the official docs, update the checked date, and record what was actually tested.
 
@@ -12,6 +12,15 @@ This document is the source of truth for what this repository assumes about Clau
 | Codex | Codex plugin with `.codex-plugin/plugin.json` | Yes | Custom subagents | Yes, but trust/UI behavior must be verified per host | `codex-plugin/` | `$yt-loop` fallback is the stable path; `$yt-loop-hook` is optional |
 | Cursor | Cursor plugin / skills / agents | Yes | Subagents | Yes | `cursor-plugin/` | Skill fallback path; verify GUI plugin load |
 | Antigravity | Antigravity plugin | Yes | Subagents | Platform-dependent; do not assume Claude/Codex hook parity | `antigravity-plugin/` | Skill fallback path; verify GUI or `agy` where available |
+
+## OS Compatibility
+
+| OS/runtime | Status | Notes |
+|---|---|---|
+| macOS | Verified static + deterministic E2E | Bash compatibility path and Node control plane are both tested locally. |
+| Linux | Supported by design | Same Bash/Node assumptions as macOS; verify in CI before claiming a specific distro. |
+| Windows WSL | Supported by design | Use the Bash compatibility path inside Ubuntu/WSL (`jq` required for Bash scripts). |
+| Windows native (PowerShell/cmd) | Supported for the control plane | Hooks, state updates, eval validation, mechanical checks, fingerprinting, and final report use `scripts/yt-loop.js` without Bash/jq. GUI host loading still needs real app verification. |
 
 ## Official Sources
 
@@ -58,4 +67,5 @@ When a future change touches cross-agent packaging:
 - Update this matrix with the official source and checked date.
 - Run `bash scripts/probe-agent-platforms.sh`.
 - Run `bash scripts/validate-packages.sh && bash scripts/e2e-smoke.sh`.
+- Run `node scripts/e2e-smoke-node.js` on Windows native or in CI `windows-latest`.
 - If a GUI check was not actually performed, write "not GUI verified" instead of implying support.

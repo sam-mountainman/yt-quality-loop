@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/scripts/hook-prompt-submit.sh\""
+            "command": "node -e \"const r=process.env.PLUGIN_ROOT||process.env.CLAUDE_PLUGIN_ROOT;if(r)require(r+'/scripts/yt-loop.js').main(['hook-prompt-submit'])\""
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/scripts/hook-stop.sh\"",
+            "command": "node -e \"const r=process.env.PLUGIN_ROOT||process.env.CLAUDE_PLUGIN_ROOT;if(r)require(r+'/scripts/yt-loop.js').main(['hook-stop'])\"",
             "timeout": 30
           }
         ]

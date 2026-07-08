@@ -9,9 +9,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [ "$#" -eq 0 ]; then
   bash "$0" "$ROOT/plugins/yt-quality-loop"
   bash "$0" "$ROOT/codex-plugin"
+  echo "== node control plane (Windows native path) =="
+  node "$ROOT/scripts/e2e-smoke-node.js"
   echo "== guard tests (goodhart対策の挙動) =="
   bash "$ROOT/scripts/guard-tests.sh"
-  echo "e2e-smoke: ok (plugins + codex-plugin + guard-tests)"
+  echo "e2e-smoke: ok (plugins + codex-plugin + node + guard-tests)"
   exit 0
 fi
 

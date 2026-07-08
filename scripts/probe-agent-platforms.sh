@@ -50,6 +50,7 @@ version_of() {
   local path
   path="$(find_cmd "$name")" || return 0
   case "$name" in
+    node) "$path" --version 2>/dev/null | head -1 ;;
     gh) "$path" --version 2>/dev/null | head -1 ;;
     jq) "$path" --version 2>/dev/null | head -1 ;;
     codex) "$path" --version 2>/dev/null | head -1 ;;
@@ -74,17 +75,32 @@ section() {
 }
 
 section "Host commands"
-for cmd in jq gh claude codex cursor agy gemini; do
+for cmd in node jq gh claude codex cursor agy gemini; do
   print_cmd "$cmd"
 done
 
 section "Versions"
-for cmd in jq gh claude codex cursor agy gemini; do
+for cmd in node jq gh claude codex cursor agy gemini; do
   v="$(version_of "$cmd")"
   if [ -n "${v:-}" ]; then
     printf '%-8s %s\n' "$cmd" "$v"
   fi
 done
+
+section "OS runtime"
+printf 'uname      %s\n' "$(uname -a 2>/dev/null || echo unknown)"
+case "$(uname -s 2>/dev/null || echo unknown)" in
+  MINGW*|MSYS*|CYGWIN*) printf 'windows    native-ish shell detected; prefer node scripts/yt-loop.js\n' ;;
+  Linux*)
+    if grep -qi microsoft /proc/version 2>/dev/null; then
+      printf 'windows    WSL detected; Bash compatibility path is available if jq is installed\n'
+    else
+      printf 'linux      Bash/Node paths available\n'
+    fi
+    ;;
+  Darwin*) printf 'macos      Bash/Node paths available\n' ;;
+  *) printf 'unknown    verify Bash/Node paths manually\n' ;;
+esac
 
 section "GUI apps"
 for app in /Applications/Codex.app /Applications/Cursor.app /Applications/Antigravity.app; do
@@ -112,6 +128,11 @@ if [ -x scripts/e2e-smoke.sh ]; then
   printf 'OK   scripts/e2e-smoke.sh present\n'
 else
   printf 'MISS scripts/e2e-smoke.sh\n'
+fi
+if [ -f scripts/e2e-smoke-node.js ]; then
+  printf 'OK   scripts/e2e-smoke-node.js present (Windows native control plane)\n'
+else
+  printf 'MISS scripts/e2e-smoke-node.js\n'
 fi
 
 section "Codex plugin state"
@@ -146,6 +167,7 @@ fi
 section "Manual checks still required"
 printf '%s\n' '- Cursor GUI: load cursor-plugin/.cursor-plugin/plugin.json and confirm skill + agent visibility.'
 printf '%s\n' '- Antigravity GUI: load antigravity-plugin/plugin.json and confirm skill + agent visibility.'
+printf '%s\n' '- Windows native GUI: confirm the host loads plugin hooks and can run node scripts/yt-loop.js.'
 printf '%s\n' '- Separate machine rehearsal: clone or unzip, then run validate + one yt-loop smoke path.'
 
 printf '\nprobe-agent-platforms: done\n'

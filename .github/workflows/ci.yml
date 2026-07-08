@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  control-plane:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install jq on Ubuntu
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Install jq on macOS
+        if: runner.os == 'macOS'
+        run: brew install jq
+
+      - name: Validate packages and Bash E2E
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          bash scripts/validate-packages.sh
+          bash scripts/e2e-smoke.sh
+
+      - name: Windows native Node E2E
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          node --check plugins/yt-quality-loop/scripts/yt-loop.js
+          node --check scripts/e2e-smoke-node.js
+          node scripts/e2e-smoke-node.js plugins/yt-quality-loop

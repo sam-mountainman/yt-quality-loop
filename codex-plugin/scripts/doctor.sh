@@ -6,11 +6,24 @@
 CWD="${1:-.}"
 echo "== yt-quality-loop doctor =="
 
+# Node (Windows native control plane / hook runner)
+if command -v node &>/dev/null; then
+  echo "○ node: $(node -v 2>/dev/null) (Windowsネイティブ制御プレーンに使用)"
+  SCRIPT_DIR_FOR_NODE="$(cd "$(dirname "$0")" && pwd)"
+  if [ -f "$SCRIPT_DIR_FOR_NODE/yt-loop.js" ]; then
+    echo "○ Node制御プレーン: あり ($SCRIPT_DIR_FOR_NODE/yt-loop.js)"
+  else
+    echo "× Node制御プレーン: yt-loop.js が見つかりません"
+  fi
+else
+  echo "× node が見つかりません → Windowsネイティブでは Node が必須です (macOS/WSLのBash経路だけなら任意)"
+fi
+
 # jq (必須)
 if command -v jq &>/dev/null; then
-  echo "○ jq: $(jq --version 2>/dev/null)"
+  echo "○ jq: $(jq --version 2>/dev/null) (Bash互換経路で使用)"
 else
-  echo "× jq が見つかりません → macOS: brew install jq / Windows(WSL): sudo apt install jq"
+  echo "× jq が見つかりません → macOS: brew install jq / Windows(WSL): sudo apt install jq (WindowsネイティブNode経路では不要)"
 fi
 
 # python3 (任意)

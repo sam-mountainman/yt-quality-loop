@@ -11,6 +11,7 @@ bash scripts/validate-packages.sh
 確認するもの:
 
 - shell syntax
+- Node syntax (`yt-loop.js`, `e2e-smoke-node.js`)
 - JSON syntax
 - plugin manifest が指す `skills` / `agents` / `hooks` の存在
 - Claude Code plugin validation
@@ -25,7 +26,7 @@ bash scripts/probe-agent-platforms.sh
 
 確認するもの:
 
-- `codex` / `claude` / `cursor` / `agy` / `gemini` / `gh` / `jq` の検出可否
+- `node` / `codex` / `claude` / `cursor` / `agy` / `gemini` / `gh` / `jq` の検出可否
 - Codex plugin list 上の `yt-quality-loop@yt-quality-loop` の状態
 - Cursor / Antigravity アプリの存在
 - GUI 確認・別マシン確認として残るもの
@@ -45,6 +46,24 @@ bash scripts/e2e-smoke.sh
 - `hook-prompt-submit.sh` が `YT_LOOP_SESSION_ID` を注入する
 
 このスモークは LLM を呼びません。配布物の制御プレーンだけを決定論的に検査します。
+
+## 2.5. Windows ネイティブ制御プレーン
+
+Windows PowerShell / cmd では Bash に依存しない Node 経路を検証します。
+
+```bash
+node scripts/e2e-smoke-node.js
+```
+
+確認するもの:
+
+- `yt-loop.js loop-start` が session-scoped state を作る
+- `yt-loop.js state-config` / `state-eval-result` が jq 無しで state を更新する
+- `yt-loop.js hook-stop` が `threshold_met` を検証して `decision: "block"` を返す
+- `yt-loop.js final-report` が納品物とレポートを作る
+- `yt-loop.js hook-prompt-submit` が `YT_LOOP_SESSION_ID` を注入する
+
+この検証が通っても、Claude Code / Codex / Cursor / Antigravity の Windows GUI がプラグインを実際に読み込むかは別項目として確認する。
 
 ## 3. Codex 実機
 
