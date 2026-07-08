@@ -106,6 +106,15 @@ claude plugin install yt-quality-loop@yt-quality-loop --scope project
 
 採点軸は**ループの途中で変わりません**。「基準を緩めて合格する」「採点を自書きする」という AI のズル (グッドハートの法則) は、スキーマ検証・合格時の再検証・ものさしの指紋照合が機械的に拒否します。ループ開始時に「どの採点係のどの軸で採点するか」が必ず表示されます — 知らないうちに他人のものさしで採点されることはありません。
 
+### Fable との使い分け
+
+Fable は「深いレビュー用の別頭」として任意で使えます。使い方は次の方針です。
+
+- Codex の Plan mode では、Fable MCP が入っていれば criteria / 動画ブリーフ / 採点アンカー / 実装方針のレビューにデフォルトで使います。
+- 通常モードでは勝手に呼びません。`Fableで見て`、`Fable5使って`、`evaluator: fable` のように明示された時だけ使います。
+- 採点で `evaluator: fable` を指定した場合も、Fable には task、criteria、成果物、プロファイル、ブリーフ、アンカー、eval JSON 契約だけを渡します。threshold、周回数、過去スコア、過去 feedback は渡しません。
+- Fable の採点結果も通常の eval JSON と同じ機械検証・合格時の再採点・指紋照合を通ります。Fable の認証が無い/失敗した場合は、通常の fresh evaluator に戻します。
+
 ### プリセットが合わない人へ (エンタメ・Vlog・考察系など)
 
 プリセットの軸と重みは、解説・ハウツー系の世界観で作った「最初の床」にすぎません。合わなければ**全部あなたの軸に入れ替えられます**:
@@ -259,6 +268,9 @@ Windows ネイティブでは、hook 制御・検証・最終レポートは `no
 
 **Q. (上級者向け) 採点係を自作したい**
 `skills/assign-yt-channel-evaluator/` をコピーして SKILL.md と eval-schema.json を書き換えれば専用の採点係が作れます。`mechanical-checks.json` の手書きも可能です。ただし通常は `/yt-profile` 経由で足ります — JSON を手で書くと壊れやすいので、まずプロファイルから。
+
+**Q. Fable で採点できますか?**
+できます。`/yt-loop ... evaluator: fable` または「Fableで採点」と明示してください。Fable も採点軸・ブリーフ・アンカーは同じものを使い、合否判定はこのプラグイン側の機械判定が行います。Fable MCP が未設定または認証失敗の場合は、通常の fresh evaluator に戻ります。
 
 ## フォルダ構成
 

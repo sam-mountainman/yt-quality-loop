@@ -1,6 +1,6 @@
 # Agent Compatibility Matrix
 
-Last checked: 2026-07-08
+Last checked: 2026-07-09
 
 This document is the source of truth for what this repository assumes about Claude Code, Codex, Cursor, and Antigravity. Do not rely on an AI agent's memory when changing cross-agent packaging. Check the official docs, update the checked date, and record what was actually tested.
 
@@ -22,6 +22,14 @@ This document is the source of truth for what this repository assumes about Clau
 | Windows WSL | Supported by design | Use the Bash compatibility path inside Ubuntu/WSL (`jq` required for Bash scripts). |
 | Windows native (PowerShell/cmd) | Supported for the control plane | Hooks, state updates, eval validation, mechanical checks, fingerprinting, and final report use `scripts/yt-loop.js` without Bash/jq. GUI host loading still needs real app verification. |
 
+## Optional Fable Integration
+
+| Mode | Expected behavior | Verification status |
+|---|---|---|
+| Codex Plan mode + `fable-mcp` available | Use Fable by default for criteria, brief, anchors, and plan review before the loop starts. | Instruction-level support. Fable MCP auth/runtime is external to this repo. |
+| Normal mode + explicit `Fable` / `Fable5` / `フェイブル` / `evaluator: fable` | Use Fable only when explicitly requested. | Instruction-level support. Falls back to the normal fresh evaluator if unavailable. |
+| Scoring with `evaluator: fable` | Keep the selected `evaluator_skill` as the scoring contract and set `evaluator_runtime` to `fable`; pass task, criteria, artifact, profile, brief, anchors, and the eval JSON contract only. Do not pass threshold, iteration, past scores, past feedback, or pass/fail expectations. | Deterministic validation remains covered by `validate-eval`, Stop hook, and `loop-judge`; Fable auth is not part of CI. |
+
 ## Official Sources
 
 | Host | Sources |
@@ -29,6 +37,7 @@ This document is the source of truth for what this repository assumes about Clau
 | Codex | [Build plugins](https://developers.openai.com/codex/plugins/build), [Hooks](https://developers.openai.com/codex/hooks), [Subagents](https://developers.openai.com/codex/subagents) |
 | Cursor | [Skills](https://cursor.com/docs/skills), [Hooks](https://cursor.com/docs/hooks), [Subagents](https://cursor.com/docs/subagents) |
 | Antigravity | [Plugins](https://antigravity.google/docs/cli/plugins), [Skills](https://antigravity.google/docs/skills), [Subagents](https://antigravity.google/docs/cli/subagents) |
+| Fable MCP | [sam-mountainman/fable-mcp](https://github.com/sam-mountainman/fable-mcp) |
 
 ## Local Verification Policy
 

@@ -22,6 +22,13 @@
 - **文字数計測は count-chars.sh** (wc -m 直呼びはロケールでバイト数になる)
 - **ユーザー向けコマンドは増やさない** (/yt-loop, /yt-profile, /yt-doctor, /yt-loop-cancel, /yt-import-skill で打ち止め)。新機能はモードとして既存コマンドに入れる
 
+## Fable 連携ポリシー
+
+- Fable は任意の外部 reviewer / evaluator であり、yt-quality-loop の必須依存ではない。Fable の認証失敗や未インストールで通常ループを止めない。
+- Codex Plan mode では、Fable MCP が利用可能なら criteria / brief / anchors / 実装計画のレビューにデフォルトで使ってよい。Plan mode 以外では、ユーザーが `Fable`, `Fable5`, `フェイブル`, `evaluator: fable` のように明示した時だけ使う。
+- 採点に Fable を使う場合も、Fable は fresh evaluator runtime として扱う。`evaluator_skill` は固定済みの採点基準 (例: `assign-yt-script-evaluator`) のままにし、`evaluator_runtime: "fable"` で別管理する。渡してよいものは task、criteria、artifact、profile、brief、anchors、eval JSON 契約だけ。threshold、iteration、過去 score、過去 feedback、合格/不合格の期待は渡さない。
+- Fable が返した eval JSON は orchestrator が編集しない。INVALID は Fable の再実行か、通常の fresh evaluator へのフォールバックで処理する。検証・合否判定は既存の validate / Stop hook / loop-judge が行う。
+
 ## 参照禁止
 
 - `/Users/higataiyu/まさお/` 配下のセミナー資料・note 記事・文字起こしは**このリポジトリの実装・文言の参照元にしない** (ユーザー指示)。プリセットの採点知識は一般知識の範囲で書く

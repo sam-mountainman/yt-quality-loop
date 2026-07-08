@@ -358,6 +358,7 @@ function fingerprintValue(stateFile) {
     state.criteria,
     state.generator_skill,
     state.evaluator_skill,
+    state.evaluator_runtime || "skill",
     state.max_iterations,
     state.brief_file,
     state.anchors_file,
@@ -738,6 +739,7 @@ function loopStart(args) {
     criteria: "",
     generator_skill: "assign-yt-generator",
     evaluator_skill: "assign-yt-evaluator",
+    evaluator_runtime: "skill",
     latest_score: null,
     evaluated_iteration: null,
     eval_repair_attempts: 0,
@@ -883,6 +885,7 @@ function finalReport(args) {
   const threshold = state.threshold || 90;
   const criteria = state.criteria || "";
   const evalSkill = state.evaluator_skill || "";
+  const evalRuntime = state.evaluator_runtime || "skill";
   const briefFile = state.brief_file || "";
   const anchorsFile = state.anchors_file || "";
   if (!outFile) {
@@ -904,6 +907,7 @@ function finalReport(args) {
   out.push(`- State: ${stateFile}`);
   out.push(`- Ended reason: ${endedReason}`);
   out.push(`- Threshold: ${threshold}`);
+  out.push(`- Evaluator: ${evalSkill} (runtime: ${evalRuntime})`);
   if (briefFile && briefFile !== "null") out.push(`- Brief: ${briefFile}`);
   if (anchorsFile && anchorsFile !== "null") out.push(`- Anchors: ${anchorsFile} (次回同じ軸なら anchors: 指定で再利用可)`);
 
@@ -1017,12 +1021,13 @@ function parseFlagArgs(args) {
 
 function stateConfig(args) {
   const stateFile = args[0];
-  if (!stateFile) throw new Error("usage: state-config <state_file> [--task ...] [--criteria ...] [--evaluator ...] [--generator ...] [--brief ...] [--anchors ...] [--runtime ...]");
+  if (!stateFile) throw new Error("usage: state-config <state_file> [--task ...] [--criteria ...] [--evaluator ...] [--evaluator-runtime skill|fable] [--generator ...] [--brief ...] [--anchors ...] [--runtime ...]");
   const flags = parseFlagArgs(args.slice(1));
   const state = readJson(stateFile, {});
   if (Object.prototype.hasOwnProperty.call(flags, "task")) state.task = flags.task;
   if (Object.prototype.hasOwnProperty.call(flags, "criteria")) state.criteria = flags.criteria;
   if (Object.prototype.hasOwnProperty.call(flags, "evaluator")) state.evaluator_skill = flags.evaluator;
+  if (Object.prototype.hasOwnProperty.call(flags, "evaluatorRuntime")) state.evaluator_runtime = flags.evaluatorRuntime || "skill";
   if (Object.prototype.hasOwnProperty.call(flags, "generator")) state.generator_skill = flags.generator;
   if (Object.prototype.hasOwnProperty.call(flags, "brief")) state.brief_file = flags.brief ? flags.brief : null;
   if (Object.prototype.hasOwnProperty.call(flags, "anchors")) state.anchors_file = flags.anchors ? flags.anchors : null;

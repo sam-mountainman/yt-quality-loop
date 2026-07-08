@@ -16,6 +16,7 @@ set -euo pipefail
 #   G8  進捗ゼロ (2 回連続スコア停滞) → no_progress + ENDED
 #   G9  max 到達 → ENDED block (納品指示が必ず出る)
 #   G10 採点アンカー改ざん (目盛りをループ中に緩める) → PASS CLAIM REJECTED (指紋)
+#   G16 evaluator_runtime 改ざん (skill/fable 切替) → PASS CLAIM REJECTED (指紋)
 #   V1-V4 validate-eval: 加重平均上振れ拒否 / 下方向許容 / 軸過不足拒否 / 短文 feedback 拒否
 #   J1-J4 codex loop-judge: 二重判定ガード / SELF-SCORED 検知 / マーカー有効 / コピペ拒否
 
@@ -265,6 +266,20 @@ jq '.latest_score=85 | .evaluated_iteration=0' "$S" > "$S.tmp" && mv "$S.tmp" "$
 CANCEL_OUT=$(bash "$P/scripts/loop-cancel.sh" "$S" --reason passed 2>&1 || true)
 if has "$CANCEL_OUT" "WARNING" && [ "$(jq -r '.ended_reason' "$S")" = "cancelled" ]; then ok "G15 cancel の合格自称 (85<90) → cancelled に降格"; else bad "G15 (ended: $(jq -r '.ended_reason' "$S"))"; fi
 
+# --- G16: evaluator_runtime 改ざん ------------------------------------------------
+S=$(new_loop g16 6 90); D="$TMP/g16"; T=$(jq -r '.turns_dir' "$S")
+jq '.evaluator_runtime="skill"' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+set_anchors "$S"
+bash "$P/scripts/fingerprint.sh" "$S" --record >/dev/null
+echo "本文" > "$T/turn-000-output.md"
+write_eval "$T" 000 93 "$FB0"
+write_confirm "$T" 000 93 "$FB1"
+SHA=$( { shasum -a 256 "$T/turn-000-output.md" 2>/dev/null || sha256sum "$T/turn-000-output.md"; } | cut -d' ' -f1 )
+jq --arg sha "$SHA" '.artifact_hashes={"000":$sha} | .evaluator_runtime="fable"' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+set_eval_state "$S" 0 93
+OUT=$(run_hook "$D" g16)
+if has "$(reason_of "$OUT")" "changed mid-loop"; then ok "G16 evaluator_runtime改ざん → 拒否"; else bad "G16"; fi
+
 # --- V1-V4: validate-eval ------------------------------------------------------
 SCHEMA="$P/skills/assign-yt-script-evaluator/eval-schema.json"
 mk_script_eval() { # $1=overall $2=hook_score $3=out
@@ -307,4 +322,4 @@ if [ "$FAIL" -ne 0 ]; then
   echo "guard-tests: FAILED" >&2
   exit 1
 fi
-echo "guard-tests: ok (G1-G15, V1-V6, J1-J4)"
+echo "guard-tests: ok (G1-G16, V1-V6, J1-J4)"
