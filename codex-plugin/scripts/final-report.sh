@@ -56,11 +56,25 @@ if [[ "$BEST_ITER" =~ ^[0-9]+$ ]]; then
     if [ -f "$SELF_DIR/validate-eval.sh" ] && ! bash "$SELF_DIR/validate-eval.sh" "$V_EVAL" "$SCHEMA" "$THRESHOLD" "$CRITERIA" >/dev/null 2>&1; then
       VERIFY_FAILS+=("best eval が契約検証に落ちる")
     fi
-    C_FILE="$TURNS_DIR/turn-$V_NNN-eval-confirm.json"
-    if [ ! -f "$C_FILE" ]; then
-      VERIFY_FAILS+=("確認採点が存在しない (合格主張に必須)")
-    elif [ "$(hash_of "$V_EVAL")" = "$(hash_of "$C_FILE")" ]; then
-      VERIFY_FAILS+=("確認採点が本採点のコピー")
+    # 確認採点の実在: 外部ジャッジ (judges) の有効な確認があればそれで足りる。無ければ host フォーク確認を要求
+    JUDGES_CONF="$(jq -r '.judges // "host"' "$STATE" 2>/dev/null || echo "host")"
+    EXT_CONF_OK=""
+    for _j in fable codex grok; do
+      case ",$JUDGES_CONF," in *",$_j,"*) ;; *) continue ;; esac
+      CJ="$TURNS_DIR/turn-$V_NNN-eval-confirm-$_j.json"
+      MJ="$TURNS_DIR/turn-$V_NNN-eval-confirm-$_j.fresh"
+      if [ -f "$CJ" ] && [ -f "$MJ" ] && [ "$(cat "$MJ" 2>/dev/null)" = "$(hash_of "$CJ")" ] \
+         && [ "$(hash_of "$V_EVAL")" != "$(hash_of "$CJ")" ]; then
+        EXT_CONF_OK="yes"
+      fi
+    done
+    if [ "$EXT_CONF_OK" != "yes" ]; then
+      C_FILE="$TURNS_DIR/turn-$V_NNN-eval-confirm.json"
+      if [ ! -f "$C_FILE" ]; then
+        VERIFY_FAILS+=("確認採点が存在しない (合格主張には host フォーク確認か外部ジャッジ確認が必須)")
+      elif [ "$(hash_of "$V_EVAL")" = "$(hash_of "$C_FILE")" ]; then
+        VERIFY_FAILS+=("確認採点が本採点のコピー")
+      fi
     fi
     if [ -f "$SELF_DIR/fingerprint.sh" ]; then
       FP_STORED="$(jq -r '.config_fingerprint // ""' "$STATE" 2>/dev/null || echo "")"
@@ -157,6 +171,42 @@ if [ -n "$self_scored" ]; then
   echo ""
   echo "自己採点に落ちた周回: $self_scored"
   echo "これは fresh な採点係が使えなかった時のフォールバックです。fresh 採点より甘くなる可能性があります。"
+fi
+
+# --- 確認採点 (judges) の開示: 誰が合格を確認したかを必ず見せる ---
+R_JUDGES="$(jq -r '.judges // "host"' "$STATE" 2>/dev/null || echo "host")"
+JC_RULE="$(jq -r '.judge_confirm.rule // ""' "$STATE" 2>/dev/null || echo "")"
+if [ "$R_JUDGES" != "host" ] || [ -n "$JC_RULE" ]; then
+  echo ""
+  echo "## 確認採点 (judges)"
+  echo ""
+  echo "- 構成: $R_JUDGES"
+  JD="$(jq -r '.judges_detected // ""' "$STATE" 2>/dev/null || echo "")"
+  if [ -n "$JD" ] && [ "$JD" != "null" ]; then
+    for _j in fable codex grok; do
+      case ",$JD," in *",$_j,"*)
+        case ",$R_JUDGES," in *",$_j,"*) ;; *) echo "- $_j: 検出済みだが不使用 (ユーザー指定)";; esac ;;
+      esac
+    done
+  fi
+  if [ -n "$JC_RULE" ]; then
+    JC_EXT="$(jq -r '.judge_confirm.ext_scores // "-"' "$STATE" 2>/dev/null || echo "-")"
+    JC_ADOPTED="$(jq -r '.judge_confirm.adopted // "-"' "$STATE" 2>/dev/null || echo "-")"
+    echo "- 判定規則: $JC_RULE / 外部スコア: ${JC_EXT:--} / 採用スコア: $JC_ADOPTED"
+    JC_FAILED="$(jq -r '.judge_confirm.failed // ""' "$STATE" 2>/dev/null || echo "")"
+    [ -n "$JC_FAILED" ] && echo "- ⚠ 失敗したジャッジ: $JC_FAILED"
+    case "$JC_RULE" in
+      median) echo "- 合格の確からしさ: ★3 (本採点 + 外部2ベンダー以上の下側中央値合意)" ;;
+      min) echo "- 合格の確からしさ: ★2 (本採点 + 外部1ベンダーの min 採用)" ;;
+      host-degraded) echo "- ⚠ 外部ジャッジ全滅のため host フォーク確認に降格 (合格の確からしさ: ★1 = 単独ベンダー相当)" ;;
+    esac
+    if [ -n "$JC_EXT" ] && [ "$JC_EXT" != "-" ] && [ "$JC_EXT" != "null" ]; then
+      JC_SPREAD="$(printf '%s\n' $JC_EXT | sort -n | awk 'NR==1{min=$1} {max=$1} END{if (NR>0) print max-min; else print 0}')"
+      if [[ "$JC_SPREAD" =~ ^[0-9]+$ ]] && [ "$JC_SPREAD" -ge 10 ]; then
+        echo "- ⚠ 外部ジャッジ間の点差が ${JC_SPREAD} 点 — 主観の効く成果物です。公開前に人間の最終確認を推奨"
+      fi
+    fi
+  fi
 fi
 
 echo ""

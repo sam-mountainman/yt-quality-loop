@@ -284,8 +284,79 @@ if [ "$SCORE" != "null" ] && [ "$SCORE" -ge "$THRESHOLD" ] 2>/dev/null; then
     fi
   fi
   # 確認採点の実在と一致: 合格主張には独立した 2 回目の採点が必要 (ガチャ合格・省略の封鎖)
+  # judges に外部ジャッジ (fable=claude / codex / grok) がある場合、確認採点の席は外部ベンダーが担う:
+  #   有効な外部採点 1 つ → min(本採点, 外部) >= threshold (現行 min 規則の席替え)
+  #   有効な外部採点 2 つ以上 → 本採点+外部の下側中央値 >= threshold (2/3 合意)。採用は min(本採点, 中央値)
+  # 外部が全滅 (.failed) した時だけ従来の host フォーク確認に降格する (降格は開示。fail-open はしない)。
   FINAL_SCORE="$EVAL_SCORE"
-  if [ -z "$VERIFY_FAIL" ]; then
+  JUDGES=$(jq -r '.judges // "host"' "$STATE_FILE" 2>/dev/null) || JUDGES="host"
+  EXT_LIST=""
+  for _j in fable codex grok; do
+    case ",$JUDGES," in *",$_j,"*) EXT_LIST="$EXT_LIST$_j ";; esac
+  done
+  JUDGE_NOTE=""
+  EXT_SCORES=""
+  EXT_FAILED=""
+  if [ -z "$VERIFY_FAIL" ] && [ -n "$EXT_LIST" ]; then
+    SCHEMA_J="$CONTROL_DIR/../skills/$EVAL_SKILL/eval-schema.json"
+    [ -f "$SCHEMA_J" ] || SCHEMA_J="-"
+    for _j in $EXT_LIST; do
+      CJ="$TURNS_DIR/turn-$NNN-eval-confirm-$_j.json"
+      MJ="$TURNS_DIR/turn-$NNN-eval-confirm-$_j.fresh"
+      FJ="$TURNS_DIR/turn-$NNN-eval-confirm-$_j.failed"
+      if [ -f "$CJ" ]; then
+        if [ ! -f "$MJ" ] || [ "$(cat "$MJ" 2>/dev/null)" != "$(hash_of "$CJ")" ]; then
+          EXT_FAILED="$EXT_FAILED$_j:fresh証明なし "
+        elif [ "$(hash_of "$EVAL_FILE")" = "$(hash_of "$CJ")" ]; then
+          EXT_FAILED="$EXT_FAILED$_j:本採点のコピー "
+        elif ! bash "$CONTROL_DIR/validate-eval.sh" "$CJ" "$SCHEMA_J" "$THRESHOLD" "$CRITERIA" >/dev/null 2>&1; then
+          EXT_FAILED="$EXT_FAILED$_j:契約違反 "
+        else
+          JSC=$(jq -r '.score // "null"' "$CJ" 2>/dev/null) || JSC="null"
+          if [[ "$JSC" =~ ^[0-9]+$ ]]; then
+            EXT_SCORES="$EXT_SCORES$JSC "
+          else
+            EXT_FAILED="$EXT_FAILED$_j:score不正 "
+          fi
+        fi
+      elif [ -f "$FJ" ]; then
+        EXT_FAILED="$EXT_FAILED$_j:$(tr -d '\n' < "$FJ" 2>/dev/null | head -c 60) "
+      else
+        VERIFY_FAIL="external confirmation for judge '$_j' not found — 合格主張の前に confirm-judges.sh を実行する (fail-open はしない)"
+        break
+      fi
+    done
+  fi
+  if [ -z "$VERIFY_FAIL" ] && [ -n "$EXT_LIST" ] && [ -n "$EXT_SCORES" ]; then
+    # 外部ジャッジ集計 (有効な外部採点があるので host フォーク確認は席替えで不要)
+    SORTED=$(printf '%s\n' $EXT_SCORES "$EVAL_SCORE" | sort -n)
+    CNT=$(printf '%s\n' "$SORTED" | wc -l | tr -d ' ')
+    JMIN=$(printf '%s\n' "$SORTED" | head -1)
+    if [ "$CNT" -ge 3 ]; then
+      AGG=$(printf '%s\n' "$SORTED" | sed -n "$(( (CNT + 1) / 2 ))p")   # 下側中央値
+      JRULE="median"
+    else
+      AGG="$JMIN"; JRULE="min"
+    fi
+    if [ "$AGG" -lt "$THRESHOLD" ] 2>/dev/null; then
+      VERIFY_FAIL="external confirmation ($JRULE=$AGG / eval=$EVAL_SCORE ext=${EXT_SCORES% }) is below threshold — 低い方を採用してループを続行する (合格主張しない)"
+    else
+      [ "$AGG" -lt "$FINAL_SCORE" ] && FINAL_SCORE="$AGG"
+      JUDGE_NOTE=" / JUDGES: ${EXT_LIST% } (rule=$JRULE, eval=$EVAL_SCORE, ext=${EXT_SCORES% }, min=$JMIN)"
+      [ -n "$EXT_FAILED" ] && JUDGE_NOTE="$JUDGE_NOTE / JUDGE FAILED: ${EXT_FAILED% } (最終報告で開示)"
+      jq --arg ext "${EXT_SCORES% }" --arg rule "$JRULE" --arg failed "${EXT_FAILED% }" \
+         --arg judges "${EXT_LIST% }" --argjson adopted "$FINAL_SCORE" \
+        '.judge_confirm = {judges:$judges, ext_scores:$ext, rule:$rule, adopted:$adopted, failed:$failed}' \
+        "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE" 2>/dev/null
+    fi
+  elif [ -z "$VERIFY_FAIL" ]; then
+    # host フォーク確認 (judges 未設定、または外部ジャッジ全滅による降格)
+    if [ -n "$EXT_LIST" ]; then
+      JUDGE_NOTE=" / JUDGES DEGRADED: 外部確認採点が全滅 (${EXT_FAILED% }) — host フォーク確認に降格 (最終報告で必ず開示)"
+      jq --arg failed "${EXT_FAILED% }" --arg judges "${EXT_LIST% }" \
+        '.judge_confirm = {judges:$judges, ext_scores:"", rule:"host-degraded", failed:$failed}' \
+        "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE" 2>/dev/null
+    fi
     CONFIRM_FILE="$TURNS_DIR/turn-$NNN-eval-confirm.json"
     if [ ! -f "$CONFIRM_FILE" ]; then
       VERIFY_FAIL="confirmation eval not found ($CONFIRM_FILE) — 合格主張には確認採点 (3d-2) が必要"
@@ -328,7 +399,7 @@ if [ "$SCORE" != "null" ] && [ "$SCORE" -ge "$THRESHOLD" ] 2>/dev/null; then
        | (if (.best_score == null or $s > .best_score) then .best_score = $s | .best_iteration = $i else . end)' \
       "$STATE_FILE" > "$STATE_FILE.tmp.$$" && mv "$STATE_FILE.tmp.$$" "$STATE_FILE" 2>/dev/null
     finalize "threshold_met"
-    emit_final_block "threshold_met (合格 — 検証済み: eval 直読 / 契約 / 機械チェック / hash / 指紋 / 確認採点)$SELF_NOTE"
+    emit_final_block "threshold_met (合格 — 検証済み: eval 直読 / 契約 / 機械チェック / hash / 指紋 / 確認採点)$SELF_NOTE$JUDGE_NOTE"
     exit 0
   fi
   # 合格主張が検証に落ちた

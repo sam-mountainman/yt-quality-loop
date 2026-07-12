@@ -79,7 +79,18 @@ node "$PLUGIN_ROOT_RESOLVED/scripts/yt-loop.js" state-config "<STATE_FILE>" \
 - 台本・ショート系タスクでは動画ブリーフ (誰向け / 約束する変化 / 絶対入れる話 / 絶対言わない話 / 視聴後の行動) を `.yt-loop/briefs/` に作り、そのパスを `$brief` に渡す
 - 採点アンカーをこの時点で `<SESSION_DIR>/criteria-anchors.md` に起草する (Step 1 参照)
 
-**ブリーフとアンカーを書き終えてから**、ものさしの指紋を記録します (順序は Stop hook が機械検証する — 生成後に記録した合格は拒否される):
+**確認ジャッジ (judges) の確定**: 合格時の確認採点を誰が担うかを、指紋の記録前に確定します:
+
+```bash
+bash "$PLUGIN_ROOT_RESOLVED/scripts/confirm-judges.sh" --detect
+```
+
+- 候補 (fable / codex / grok) のうち**周回採点と同じベンダーを除いたもの**を使う。Codex では codex (= codex CLI) は同ベンダーなので除外し、fable / grok を採用する
+- ユーザーが `judges: host` を指定したら外部を使わない。明示指定 (`judges: host+grok` 等) はそれに従う
+- `node "$PLUGIN_ROOT_RESOLVED/scripts/yt-loop.js" state-config "<STATE_FILE>" --judges "host,fable,grok" --judges-detected "<検出結果をカンマ区切り>"` で記録する (候補ゼロなら `--judges "host"` = 従来動作)
+- **judges は指紋対象** — ループ開始後に構成を変えると pass gate が合格を拒否する
+
+**ブリーフ・アンカー・judges を書き終えてから**、ものさしの指紋を記録します (順序は Stop hook が機械検証する — 生成後に記録した合格は拒否される):
 
 ```bash
 node "$PLUGIN_ROOT_RESOLVED/scripts/yt-loop.js" fingerprint "<STATE_FILE>" --record
@@ -166,7 +177,19 @@ node "$PLUGIN_ROOT_RESOLVED/scripts/yt-loop.js" validate-eval "$EVAL_FILE" "-" "
 
 通ったら `node "$PLUGIN_ROOT_RESOLVED/scripts/yt-loop.js" state-eval-result "<STATE_FILE>" "<ITER>" "<SCORE>" --artifact "<ARTIFACT_FILE>"` で `latest_score`, `phase="eval"`, `evaluated_iteration`, `best_score`, `best_iteration`, `artifact_hashes[NNN]` を更新します。
 
-**score >= threshold の場合のみ、応答を終える前に確認採点を実行する** (Stop hook の pass gate が確認採点の実在・本採点との相違・min >= threshold を機械検証する — 省略した合格主張は拒否される):
+**score >= threshold の場合のみ、応答を終える前に確認採点を実行する** (Stop hook の pass gate が確認採点の実在・本採点との相違・集計規則 >= threshold を機械検証する — 省略した合格主張は拒否される):
+
+**A. judges に外部ジャッジ (fable/grok 等) がある場合** — 確認採点の席は外部ベンダーが担う:
+
+```bash
+bash "$PLUGIN_ROOT_RESOLVED/scripts/confirm-judges.sh" "<STATE_FILE>"
+```
+
+- 各外部 CLI が `turn-NNN-eval-confirm-<judge>.json` (+ `.fresh` 証明) または `.failed` を書く。**JSON を手で書いたり編集したりしない** — fresh 証明の無い確認は失敗扱いになる
+- 最終行が `RESULT:OK` なら B は不要。`RESULT:ALL_FAILED` なら B も実行する (降格は最終報告で自動開示)
+- 判定規則は機械側: 外部 1 体 = min / 2 体以上 = 下側中央値 (2/3 合意)。採用スコアは下げる方向にのみ動く
+
+**B. judges が host のみ (または外部全滅) の場合** — 従来のフォーク確認:
 
 1. 同じ渡し物 (出力先だけ `turn-NNN-eval-confirm.json`) で fresh evaluator をもう 1 体スポーンする (**本採点のコピーで代用しない** — バイト一致は機械的に弾かれる。ファイルの差し替え/cp もしない)
 2. validate を通ったら、`latest_score` に**低い方のスコア**を書く (両ファイルはそのまま残す — pass gate が両方を読んで min を検証する)。confirm が threshold 未満なら合格主張にならず、通常どおり応答終了で Stop hook が次周へ送る

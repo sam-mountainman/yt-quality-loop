@@ -359,6 +359,7 @@ function fingerprintValue(stateFile) {
     state.generator_skill,
     state.evaluator_skill,
     state.evaluator_runtime || "skill",
+    state.judges || "host",
     state.max_iterations,
     state.brief_file,
     state.anchors_file,
@@ -592,8 +593,66 @@ Next actions (do all in ONE response, then end it):
         verifyFail = "anchors_file is not set — 自由 criteria は採点アンカー (90/75の目盛り) を起草・固定してから回す";
       }
     }
+    // 確認採点。judges に外部ジャッジ (fable/codex/grok) があれば確認採点の席は外部ベンダーが担う:
+    //   有効な外部採点 1 つ → min 規則の席替え / 2 つ以上 → 下側中央値 (2/3 合意)。採用は min(本採点, 集計)。
+    //   外部が全滅した時だけ host フォーク確認に降格 (開示付き。fail-open しない)。
     let finalScore = evalScore;
-    if (!verifyFail) {
+    let judgeNote = "";
+    const judgesConf = String(state.judges || "host");
+    const extList = ["fable", "codex", "grok"].filter((j) => (`,${judgesConf},`).includes(`,${j},`));
+    const extScores = [];
+    const extFailed = [];
+    if (!verifyFail && extList.length > 0) {
+      for (const j of extList) {
+        const cj = path.join(turnsDir, `turn-${nnn}-eval-confirm-${j}.json`);
+        const mj = path.join(turnsDir, `turn-${nnn}-eval-confirm-${j}.fresh`);
+        const fj = path.join(turnsDir, `turn-${nnn}-eval-confirm-${j}.failed`);
+        if (fileExists(cj)) {
+          if (!fileExists(mj) || readText(mj).trim() !== sha256File(cj)) {
+            extFailed.push(`${j}:fresh証明なし`);
+          } else if (sha256File(evalFile) === sha256File(cj)) {
+            extFailed.push(`${j}:本採点のコピー`);
+          } else if (validateEvalData(cj, getSchemaFile(evalSkill), threshold, criteria).length > 0) {
+            extFailed.push(`${j}:契約違反`);
+          } else {
+            const jsc = readJson(cj, {}).score;
+            if (Number.isInteger(jsc)) extScores.push(jsc);
+            else extFailed.push(`${j}:score不正`);
+          }
+        } else if (fileExists(fj)) {
+          extFailed.push(`${j}:${readText(fj).replace(/\n/g, " ").slice(0, 60)}`);
+        } else {
+          verifyFail = `external confirmation for judge '${j}' not found — 合格主張の前に confirm-judges.sh を実行する (fail-open はしない)`;
+          break;
+        }
+      }
+    }
+    if (!verifyFail && extList.length > 0 && extScores.length > 0) {
+      const sorted = [...extScores, evalScore].sort((a, b) => a - b);
+      const cnt = sorted.length;
+      const jmin = sorted[0];
+      let agg;
+      let jrule;
+      if (cnt >= 3) {
+        agg = sorted[Math.floor((cnt - 1) / 2)]; // 下側中央値
+        jrule = "median";
+      } else {
+        agg = jmin;
+        jrule = "min";
+      }
+      if (agg < threshold) {
+        verifyFail = `external confirmation (${jrule}=${agg} / eval=${evalScore} ext=${extScores.join(" ")}) is below threshold — 低い方を採用してループを続行する (合格主張しない)`;
+      } else {
+        if (agg < finalScore) finalScore = agg;
+        judgeNote = ` / JUDGES: ${extList.join(" ")} (rule=${jrule}, eval=${evalScore}, ext=${extScores.join(" ")}, min=${jmin})`;
+        if (extFailed.length > 0) judgeNote += ` / JUDGE FAILED: ${extFailed.join(" ")} (最終報告で開示)`;
+        state.judge_confirm = { judges: extList.join(" "), ext_scores: extScores.join(" "), rule: jrule, adopted: finalScore, failed: extFailed.join(" ") };
+      }
+    } else if (!verifyFail) {
+      if (extList.length > 0) {
+        judgeNote = ` / JUDGES DEGRADED: 外部確認採点が全滅 (${extFailed.join(" ")}) — host フォーク確認に降格 (最終報告で必ず開示)`;
+        state.judge_confirm = { judges: extList.join(" "), ext_scores: "", rule: "host-degraded", failed: extFailed.join(" ") };
+      }
       const confirmFile = path.join(turnsDir, `turn-${nnn}-eval-confirm.json`);
       if (!fileExists(confirmFile)) {
         verifyFail = `confirmation eval not found (${confirmFile}) — 合格主張には確認採点 (3d-2) が必要`;
@@ -629,7 +688,7 @@ Next actions (do all in ONE response, then end it):
       }
       writeJsonAtomic(stateFile, state);
       finalize(stateFile, "threshold_met");
-      emitFinalBlock(stateFile, loopLabel, `threshold_met (合格 — 検証済み: eval 直読 / 契約 / 機械チェック / hash / 指紋 / 確認採点)${selfNote}`);
+      emitFinalBlock(stateFile, loopLabel, `threshold_met (合格 — 検証済み: eval 直読 / 契約 / 機械チェック / hash / 指紋 / 確認採点)${selfNote}${judgeNote}`);
       return;
     }
     if (repair >= 2) {
@@ -740,6 +799,7 @@ function loopStart(args) {
     generator_skill: "assign-yt-generator",
     evaluator_skill: "assign-yt-evaluator",
     evaluator_runtime: "skill",
+    judges: "host",
     latest_score: null,
     evaluated_iteration: null,
     eval_repair_attempts: 0,
@@ -927,9 +987,22 @@ function finalReport(args) {
     if (endedReason === "threshold_met") {
       const errors = validateEvalData(bestEval, getSchemaFile(evalSkill), threshold, criteria);
       if (errors.length > 0) verifyFails.push("best eval が契約検証に落ちる");
-      const cFile = path.join(turnsDir, `turn-${nnn}-eval-confirm.json`);
-      if (!fileExists(cFile)) verifyFails.push("確認採点が存在しない (合格主張に必須)");
-      else if (sha256File(bestEval) === sha256File(cFile)) verifyFails.push("確認採点が本採点のコピー");
+      // 確認採点の実在: 外部ジャッジ (judges) の有効な確認があればそれで足りる
+      const judgesConf = String(state.judges || "host");
+      let extConfOk = false;
+      for (const j of ["fable", "codex", "grok"]) {
+        if (!(`,${judgesConf},`).includes(`,${j},`)) continue;
+        const cj = path.join(turnsDir, `turn-${nnn}-eval-confirm-${j}.json`);
+        const mj = path.join(turnsDir, `turn-${nnn}-eval-confirm-${j}.fresh`);
+        if (fileExists(cj) && fileExists(mj) && readText(mj).trim() === sha256File(cj) && sha256File(bestEval) !== sha256File(cj)) {
+          extConfOk = true;
+        }
+      }
+      if (!extConfOk) {
+        const cFile = path.join(turnsDir, `turn-${nnn}-eval-confirm.json`);
+        if (!fileExists(cFile)) verifyFails.push("確認採点が存在しない (合格主張には host フォーク確認か外部ジャッジ確認が必須)");
+        else if (sha256File(bestEval) === sha256File(cFile)) verifyFails.push("確認採点が本採点のコピー");
+      }
       const storedFp = state.config_fingerprint || "";
       const nowFp = fingerprintValue(stateFile);
       if (!storedFp || (nowFp && nowFp !== storedFp)) verifyFails.push("ものさしの指紋が不一致または未記録");
@@ -991,6 +1064,33 @@ function finalReport(args) {
     out.push("", "## 採点メモ", "", `自己採点に落ちた周回: ${state.self_scored.join(", ")}`);
     out.push("これは fresh な採点係が使えなかった時のフォールバックです。fresh 採点より甘くなる可能性があります。");
   }
+  // 確認採点 (judges) の開示: 誰が合格を確認したかを必ず見せる
+  const rJudges = String(state.judges || "host");
+  const jc = state.judge_confirm || null;
+  if (rJudges !== "host" || jc) {
+    out.push("", "## 確認採点 (judges)", "");
+    out.push(`- 構成: ${rJudges}`);
+    const jd = String(state.judges_detected || "");
+    if (jd && jd !== "null") {
+      for (const j of ["fable", "codex", "grok"]) {
+        if ((`,${jd},`).includes(`,${j},`) && !(`,${rJudges},`).includes(`,${j},`)) {
+          out.push(`- ${j}: 検出済みだが不使用 (ユーザー指定)`);
+        }
+      }
+    }
+    if (jc && jc.rule) {
+      out.push(`- 判定規則: ${jc.rule} / 外部スコア: ${jc.ext_scores || "-"} / 採用スコア: ${jc.adopted === undefined ? "-" : jc.adopted}`);
+      if (jc.failed) out.push(`- ⚠ 失敗したジャッジ: ${jc.failed}`);
+      if (jc.rule === "median") out.push("- 合格の確からしさ: ★3 (本採点 + 外部2ベンダー以上の下側中央値合意)");
+      else if (jc.rule === "min") out.push("- 合格の確からしさ: ★2 (本採点 + 外部1ベンダーの min 採用)");
+      else if (jc.rule === "host-degraded") out.push("- ⚠ 外部ジャッジ全滅のため host フォーク確認に降格 (合格の確からしさ: ★1 = 単独ベンダー相当)");
+      const extNums = String(jc.ext_scores || "").split(/\s+/).filter((s) => /^[0-9]+$/.test(s)).map(Number);
+      if (extNums.length >= 2) {
+        const spread = Math.max(...extNums) - Math.min(...extNums);
+        if (spread >= 10) out.push(`- ⚠ 外部ジャッジ間の点差が ${spread} 点 — 主観の効く成果物です。公開前に人間の最終確認を推奨`);
+      }
+    }
+  }
   out.push("", "## 次回への反映", "");
   out.push("- 納品物を手直ししたら /yt-profile 更新 で直しを次回に反映できます。");
   out.push("- スコアは同一成果物でも±数点ブレます。90点は再生数保証ではなく、公開前の品質基準です。");
@@ -1021,13 +1121,15 @@ function parseFlagArgs(args) {
 
 function stateConfig(args) {
   const stateFile = args[0];
-  if (!stateFile) throw new Error("usage: state-config <state_file> [--task ...] [--criteria ...] [--evaluator ...] [--evaluator-runtime skill|fable] [--generator ...] [--brief ...] [--anchors ...] [--runtime ...]");
+  if (!stateFile) throw new Error("usage: state-config <state_file> [--task ...] [--criteria ...] [--evaluator ...] [--evaluator-runtime skill|fable] [--judges host[,fable][,codex][,grok]] [--generator ...] [--brief ...] [--anchors ...] [--runtime ...]");
   const flags = parseFlagArgs(args.slice(1));
   const state = readJson(stateFile, {});
   if (Object.prototype.hasOwnProperty.call(flags, "task")) state.task = flags.task;
   if (Object.prototype.hasOwnProperty.call(flags, "criteria")) state.criteria = flags.criteria;
   if (Object.prototype.hasOwnProperty.call(flags, "evaluator")) state.evaluator_skill = flags.evaluator;
   if (Object.prototype.hasOwnProperty.call(flags, "evaluatorRuntime")) state.evaluator_runtime = flags.evaluatorRuntime || "skill";
+  if (Object.prototype.hasOwnProperty.call(flags, "judges")) state.judges = flags.judges || "host";
+  if (Object.prototype.hasOwnProperty.call(flags, "judgesDetected")) state.judges_detected = flags.judgesDetected || "";
   if (Object.prototype.hasOwnProperty.call(flags, "generator")) state.generator_skill = flags.generator;
   if (Object.prototype.hasOwnProperty.call(flags, "brief")) state.brief_file = flags.brief ? flags.brief : null;
   if (Object.prototype.hasOwnProperty.call(flags, "anchors")) state.anchors_file = flags.anchors ? flags.anchors : null;

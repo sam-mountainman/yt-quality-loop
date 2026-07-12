@@ -22,6 +22,16 @@
 - **文字数計測は count-chars.sh** (wc -m 直呼びはロケールでバイト数になる)
 - **ユーザー向けコマンドは増やさない** (/yt-loop, /yt-profile, /yt-doctor, /yt-loop-cancel, /yt-import-skill で打ち止め)。新機能はモードとして既存コマンドに入れる
 
+## 多ベンダー確認採点 (judges) ポリシー
+
+- judges は**合格ゲート専用**。周回中の採点係 (evaluator / evaluator_runtime) には触れない。周回中パネル・毎周平均は導入しない (フィードバック分裂・停滞判定破壊・コスト増のため設計却下済み)
+- ジャッジの実体は **CLI 直呼び** (fable=claude / codex=codex / grok=grok CLI、confirm-judges.sh が決定論で回す)。MCP は使わない — MCP (fable-mcp / codex-mcp / grok 系) は対話・レビュー層と evaluator_runtime の担当で、層が違う
+- auto の規則は「検出された候補から**周回採点と同じベンダーを除く**」。Claude 系ホストは fable を除外、Codex は codex を除外
+- 集計は 外部 1 体 = min / 2 体以上 = 下側中央値 (2/3 合意)。採用スコアは本採点より上がらない (下げる方向にのみ動く)
+- 外部ジャッジの失敗は .failed マーカーで開示し、**fail-open しない** (全滅時は host フォーク確認に降格 + 最終報告で開示)。judges は指紋対象 — 途中変更は合格拒否 (G21)
+- 外部ジャッジに渡してよいもの: task / 採点軸 / プロファイル / ブリーフ / アンカー / 成果物本文 / eval JSON 契約。渡さないもの: threshold / 周回数 / 過去スコア / 過去 feedback / 本採点の結果
+- 機械強制があるのは hook 経路 (loop-control.sh / yt-loop.js) のみ。skill 環境版 (`$yt-loop`) は開示ベース — この非対称は意図的な差分
+
 ## Fable 連携ポリシー
 
 - Fable は任意の外部 reviewer / evaluator であり、yt-quality-loop の必須依存ではない。Fable の認証失敗や未インストールで通常ループを止めない。

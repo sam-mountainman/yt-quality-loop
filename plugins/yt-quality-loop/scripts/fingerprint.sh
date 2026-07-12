@@ -4,7 +4,7 @@ set -euo pipefail
 # Usage: fingerprint.sh <state_file>            # 現在の指紋を stdout に出す
 #        fingerprint.sh <state_file> --record   # state.json の config_fingerprint に記録 (未記録時のみ)
 #
-# 指紋の対象 = threshold / criteria / generator_skill / evaluator_skill / evaluator_runtime / max_iterations
+# 指紋の対象 = threshold / criteria / generator_skill / evaluator_skill / evaluator_runtime / judges / max_iterations
 #            + channel-profile.md の中身 + mechanical-checks.json の中身
 #            + brief_file (動画ブリーフ) の中身
 #            + anchors_file (自由 criteria の採点アンカー) の中身
@@ -42,7 +42,7 @@ SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 HASH=$(
   {
-    jq -r '[.threshold, .criteria, .generator_skill, .evaluator_skill, (.evaluator_runtime // "skill"), .max_iterations, .brief_file, .anchors_file] | @json' "$STATE" 2>/dev/null || true
+    jq -r '[.threshold, .criteria, .generator_skill, .evaluator_skill, (.evaluator_runtime // "skill"), (.judges // "host"), .max_iterations, .brief_file, .anchors_file] | @json' "$STATE" 2>/dev/null || true
     cat "$PROJ/.yt-loop/channel-profile.md" 2>/dev/null || true
     cat "$PROJ/.yt-loop/mechanical-checks.json" 2>/dev/null || true
     if [ -n "$BRIEF" ] && [ "$BRIEF" != "null" ]; then cat "$BRIEF" 2>/dev/null || true; fi

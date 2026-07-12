@@ -17,6 +17,8 @@ set -euo pipefail
 #   G9  max 到達 → ENDED block (納品指示が必ず出る)
 #   G10 採点アンカー改ざん (目盛りをループ中に緩める) → PASS CLAIM REJECTED (指紋)
 #   G16 evaluator_runtime 改ざん (skill/fable 切替) → PASS CLAIM REJECTED (指紋)
+#   G17-G22 多ベンダー確認採点 (judges): 欠落拒否 / min席替え / median合意 / 全滅降格 /
+#           fail-open封鎖 / judges改ざん拒否 / fresh証明なし拒否 + CJ1 ランナー成果物
 #   V1-V4 validate-eval: 加重平均上振れ拒否 / 下方向許容 / 軸過不足拒否 / 短文 feedback 拒否
 #   J1-J4 codex loop-judge: 二重判定ガード / SELF-SCORED 検知 / マーカー有効 / コピペ拒否
 
@@ -280,6 +282,116 @@ set_eval_state "$S" 0 93
 OUT=$(run_hook "$D" g16)
 if has "$(reason_of "$OUT")" "changed mid-loop"; then ok "G16 evaluator_runtime改ざん → 拒否"; else bad "G16"; fi
 
+# --- G17-G22: 多ベンダー確認採点 (judges) -------------------------------------------
+
+write_ext_confirm() { # $1=turns_dir $2=NNN $3=judge $4=score $5=feedback
+  jq -n --argjson s "$4" --arg fb "$5" \
+    '{score:$s, quality:{overall:$s, breakdown:{a:($s-1), b:($s+1)}}, feedback:$fb, evaluator_skill:"e"}' \
+    > "$1/turn-$2-eval-confirm-$3.json"
+  { shasum -a 256 "$1/turn-$2-eval-confirm-$3.json" 2>/dev/null || sha256sum "$1/turn-$2-eval-confirm-$3.json"; } \
+    | cut -d' ' -f1 > "$1/turn-$2-eval-confirm-$3.fresh"
+}
+
+pass_setup() { # $1=session_id $2=judges → S/D/T をセット (eval 92, artifact hash 済み)
+  S=$(new_loop "$1" 6 90); D="$TMP/$1"; T=$(jq -r '.turns_dir' "$S")
+  jq --arg j "$2" '.judges=$j' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+  set_anchors "$S"
+  bash "$P/scripts/fingerprint.sh" "$S" --record >/dev/null
+  echo "本文" > "$T/turn-000-output.md"
+  write_eval "$T" 000 92 "$FB0"
+  SHA=$( { shasum -a 256 "$T/turn-000-output.md" 2>/dev/null || sha256sum "$T/turn-000-output.md"; } | cut -d' ' -f1 )
+  jq --arg sha "$SHA" '.artifact_hashes={"000":$sha}' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+  set_eval_state "$S" 0 92
+}
+
+# G17: 外部ジャッジ確認の欠落 → 拒否 (fail-open しない)
+pass_setup g17 "host,grok"
+OUT=$(run_hook "$D" g17)
+if has "$(reason_of "$OUT")" "confirm-judges.sh" && [ "$(jq -r '.active' "$S")" = "true" ]; then
+  ok "G17 外部ジャッジ確認の欠落 → 拒否"; else bad "G17"; fi
+
+# G18: 外部1体 (min規則) — host フォーク確認なしで合格し、低い方 (91) を採用
+pass_setup g18 "host,grok"
+write_ext_confirm "$T" 000 grok 91 "$FB1"
+OUT=$(run_hook "$D" g18)
+if has "$(reason_of "$OUT")" "ENDED: threshold_met" \
+   && has "$(reason_of "$OUT")" "rule=min" \
+   && [ "$(jq -r '.latest_score' "$S")" = "91" ] \
+   && [ "$(jq -r '.judge_confirm.rule' "$S")" = "min" ]; then
+  ok "G18 外部1体min規則 → 合格 (91採用・hostフォーク不要)"; else bad "G18"; fi
+
+# G19a: 外部2体 (下側中央値) — eval=92, fable=88, grok=91 → median 91 >= 90 で合格
+pass_setup g19a "host,fable,grok"
+write_ext_confirm "$T" 000 fable 88 "$FB1"
+write_ext_confirm "$T" 000 grok 91 "$FB2"
+OUT=$(run_hook "$D" g19a)
+if has "$(reason_of "$OUT")" "ENDED: threshold_met" \
+   && has "$(reason_of "$OUT")" "rule=median" \
+   && [ "$(jq -r '.latest_score' "$S")" = "91" ]; then
+  ok "G19a 外部2体median規則 → 合格 (中央値91採用)"; else bad "G19a"; fi
+
+# G19b: 中央値が threshold 未満 → 拒否 (eval=92, fable=85, grok=89 → median 89)
+pass_setup g19b "host,fable,grok"
+write_ext_confirm "$T" 000 fable 85 "$FB1"
+write_ext_confirm "$T" 000 grok 89 "$FB2"
+OUT=$(run_hook "$D" g19b)
+if has "$(reason_of "$OUT")" "below threshold" && [ "$(jq -r '.active' "$S")" = "true" ]; then
+  ok "G19b 中央値がthreshold未満 → 拒否 (ループ続行)"; else bad "G19b"; fi
+
+# G20a: 外部全滅 (.failed) + host フォーク確認あり → 降格して合格 (開示付き)
+pass_setup g20a "host,grok"
+printf 'CLI error or timeout' > "$T/turn-000-eval-confirm-grok.failed"
+write_confirm "$T" 000 93 "$FB1"
+OUT=$(run_hook "$D" g20a)
+if has "$(reason_of "$OUT")" "ENDED: threshold_met" \
+   && has "$(reason_of "$OUT")" "JUDGES DEGRADED" \
+   && [ "$(jq -r '.judge_confirm.rule' "$S")" = "host-degraded" ]; then
+  ok "G20a 外部全滅+host確認 → 降格合格 (開示付き)"; else bad "G20a"; fi
+
+# G20b: 外部全滅 + host フォーク確認も無し → 拒否 (失敗で甘くならない)
+pass_setup g20b "host,grok"
+printf 'CLI error or timeout' > "$T/turn-000-eval-confirm-grok.failed"
+OUT=$(run_hook "$D" g20b)
+if has "$(reason_of "$OUT")" "confirmation eval not found" && [ "$(jq -r '.active' "$S")" = "true" ]; then
+  ok "G20b 外部全滅+host確認なし → 拒否 (fail-openしない)"; else bad "G20b"; fi
+
+# G21: judges 改ざん (記録後に外部ジャッジを外す) → 指紋不一致で拒否
+pass_setup g21 "host,grok"
+write_ext_confirm "$T" 000 grok 91 "$FB1"
+jq '.judges="host"' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+write_confirm "$T" 000 93 "$FB2"
+OUT=$(run_hook "$D" g21)
+if has "$(reason_of "$OUT")" "changed mid-loop"; then ok "G21 judges改ざん → 拒否 (指紋)"; else bad "G21"; fi
+
+# G22: fresh 証明なしの外部確認 → 失敗扱い (host確認も無ければ拒否)
+pass_setup g22 "host,grok"
+write_ext_confirm "$T" 000 grok 95 "$FB1"
+rm -f "$T/turn-000-eval-confirm-grok.fresh"
+OUT=$(run_hook "$D" g22)
+if has "$(reason_of "$OUT")" "confirmation eval not found" && [ "$(jq -r '.active' "$S")" = "true" ]; then
+  ok "G22 fresh証明なしの外部確認 → 失敗扱いで拒否"; else bad "G22"; fi
+
+# CJ1: confirm-judges.sh ランナー (stub CLI 注入) — 成功で .json + .fresh、失敗で .failed
+STUB="$TMP/stubbin"; mkdir -p "$STUB"
+cat > "$STUB/grok-ok" <<'STUBEOF'
+#!/bin/bash
+printf '{"score":91,"quality":{"overall":91,"breakdown":{"a":90,"b":92}},"feedback":"軸aは冒頭の2文が説明的で弱い。1文目に数字を置き、2文目で視聴者の損失を名指しする形に変えると前のめりになる。軸bは維持でよい。","evaluator_skill":"e"}\n'
+STUBEOF
+cat > "$STUB/grok-ng" <<'STUBEOF'
+#!/bin/bash
+exit 1
+STUBEOF
+chmod +x "$STUB/grok-ok" "$STUB/grok-ng"
+pass_setup cj1 "host,grok"
+R1=""; R2=""
+OUT=$(GROK_BIN="$STUB/grok-ok" bash "$P/scripts/confirm-judges.sh" "$S" 2>&1)
+if has "$OUT" "JUDGE:grok SCORE:91" && has "$OUT" "RESULT:OK" \
+   && [ -f "$T/turn-000-eval-confirm-grok.json" ] && [ -f "$T/turn-000-eval-confirm-grok.fresh" ]; then R1="ok"; fi
+OUT=$(GROK_BIN="$STUB/grok-ng" bash "$P/scripts/confirm-judges.sh" "$S" 2>&1)
+if has "$OUT" "JUDGE:grok FAILED" && has "$OUT" "RESULT:ALL_FAILED" \
+   && [ -f "$T/turn-000-eval-confirm-grok.failed" ] && [ ! -f "$T/turn-000-eval-confirm-grok.json" ]; then R2="ok"; fi
+if [ "$R1$R2" = "okok" ]; then ok "CJ1 confirm-judges.sh 成功/失敗の成果物"; else bad "CJ1 ($R1/$R2)"; fi
+
 # --- V1-V4: validate-eval ------------------------------------------------------
 SCHEMA="$P/skills/assign-yt-script-evaluator/eval-schema.json"
 mk_script_eval() { # $1=overall $2=hook_score $3=out
@@ -322,4 +434,4 @@ if [ "$FAIL" -ne 0 ]; then
   echo "guard-tests: FAILED" >&2
   exit 1
 fi
-echo "guard-tests: ok (G1-G16, V1-V6, J1-J4)"
+echo "guard-tests: ok (G1-G22, CJ1, V1-V6, J1-J4)"
