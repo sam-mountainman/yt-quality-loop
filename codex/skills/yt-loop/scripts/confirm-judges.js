@@ -91,14 +91,15 @@ function providerDefinitions(state = {}) {
   };
 }
 
-function quoteCmdArg(value) {
-  return `"${String(value).replace(/%/g, "%%").replace(/"/g, '""')}"`;
-}
-
 function spawnCli(bin, args, options) {
   if (process.platform === "win32" && /\.(cmd|bat)$/i.test(bin)) {
-    const command = [bin, ...args].map(quoteCmdArg).join(" ");
-    return spawnSync(process.env.ComSpec || process.env.COMSPEC || "cmd.exe", ["/d", "/s", "/c", command], options);
+    // `call` keeps the command line from starting with a quoted path, which
+    // avoids cmd.exe /S stripping the executable path's outer quotes.
+    return spawnSync(
+      process.env.ComSpec || process.env.COMSPEC || "cmd.exe",
+      ["/d", "/s", "/c", "call", bin, ...args],
+      options,
+    );
   }
   return spawnSync(bin, args, options);
 }

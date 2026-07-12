@@ -144,7 +144,7 @@ function smoke(pluginRoot) {
 
     console.log("== node external judge ==");
     const judgeOut = runJudge(pluginRoot, [stateFile], { env: judgeEnv });
-    assert(judgeOut.includes("JUDGE:grok MODEL:grok-test SCORE:92"));
+    assert(judgeOut.includes("JUDGE:grok MODEL:grok-test SCORE:92"), `unexpected judge output:\n${judgeOut}`);
     assert(fs.existsSync(path.join(turnsDir, "turn-000-eval-confirm-grok.fresh")));
 
     console.log("== node stop hook threshold_met ==");
