@@ -17,8 +17,8 @@ set -euo pipefail
 #   G9  max 到達 → ENDED block (納品指示が必ず出る)
 #   G10 採点アンカー改ざん (目盛りをループ中に緩める) → PASS CLAIM REJECTED (指紋)
 #   G16 evaluator_runtime 改ざん (skill/fable 切替) → PASS CLAIM REJECTED (指紋)
-#   G17-G22 多ベンダー確認採点 (judges): 欠落拒否 / min席替え / median合意 / 全滅降格 /
-#           fail-open封鎖 / judges改ざん拒否 / fresh証明なし拒否 + CJ1 ランナー成果物
+#   G17-G23 多ベンダー確認採点 (judges): 欠落拒否 / min席替え / median合意 / 全滅降格 /
+#           fail-open封鎖 / judges・model改ざん拒否 / 整合マーカーなし拒否 + CJ1 ランナー成果物
 #   V1-V4 validate-eval: 加重平均上振れ拒否 / 下方向許容 / 軸過不足拒否 / 短文 feedback 拒否
 #   J1-J4 codex loop-judge: 二重判定ガード / SELF-SCORED 検知 / マーカー有効 / コピペ拒否
 
@@ -307,7 +307,7 @@ pass_setup() { # $1=session_id $2=judges → S/D/T をセット (eval 92, artifa
 # G17: 外部ジャッジ確認の欠落 → 拒否 (fail-open しない)
 pass_setup g17 "host,grok"
 OUT=$(run_hook "$D" g17)
-if has "$(reason_of "$OUT")" "confirm-judges.sh" && [ "$(jq -r '.active' "$S")" = "true" ]; then
+if has "$(reason_of "$OUT")" "confirm-judges.js" && [ "$(jq -r '.active' "$S")" = "true" ]; then
   ok "G17 外部ジャッジ確認の欠落 → 拒否"; else bad "G17"; fi
 
 # G18: 外部1体 (min規則) — host フォーク確認なしで合格し、低い方 (91) を採用
@@ -320,9 +320,9 @@ if has "$(reason_of "$OUT")" "ENDED: threshold_met" \
    && [ "$(jq -r '.judge_confirm.rule' "$S")" = "min" ]; then
   ok "G18 外部1体min規則 → 合格 (91採用・hostフォーク不要)"; else bad "G18"; fi
 
-# G19a: 外部2体 (下側中央値) — eval=92, fable=88, grok=91 → median 91 >= 90 で合格
-pass_setup g19a "host,fable,grok"
-write_ext_confirm "$T" 000 fable 88 "$FB1"
+# G19a: 外部2体 (下側中央値) — eval=92, claude=88, grok=91 → median 91 >= 90 で合格
+pass_setup g19a "host,claude,grok"
+write_ext_confirm "$T" 000 claude 88 "$FB1"
 write_ext_confirm "$T" 000 grok 91 "$FB2"
 OUT=$(run_hook "$D" g19a)
 if has "$(reason_of "$OUT")" "ENDED: threshold_met" \
@@ -330,9 +330,9 @@ if has "$(reason_of "$OUT")" "ENDED: threshold_met" \
    && [ "$(jq -r '.latest_score' "$S")" = "91" ]; then
   ok "G19a 外部2体median規則 → 合格 (中央値91採用)"; else bad "G19a"; fi
 
-# G19b: 中央値が threshold 未満 → 拒否 (eval=92, fable=85, grok=89 → median 89)
-pass_setup g19b "host,fable,grok"
-write_ext_confirm "$T" 000 fable 85 "$FB1"
+# G19b: 中央値が threshold 未満 → 拒否 (eval=92, claude=85, grok=89 → median 89)
+pass_setup g19b "host,claude,grok"
+write_ext_confirm "$T" 000 claude 85 "$FB1"
 write_ext_confirm "$T" 000 grok 89 "$FB2"
 OUT=$(run_hook "$D" g19b)
 if has "$(reason_of "$OUT")" "below threshold" && [ "$(jq -r '.active' "$S")" = "true" ]; then
@@ -363,15 +363,22 @@ write_confirm "$T" 000 93 "$FB2"
 OUT=$(run_hook "$D" g21)
 if has "$(reason_of "$OUT")" "changed mid-loop"; then ok "G21 judges改ざん → 拒否 (指紋)"; else bad "G21"; fi
 
-# G22: fresh 証明なしの外部確認 → 失敗扱い (host確認も無ければ拒否)
+# G22: 整合マーカーなしの外部確認 → 失敗扱い (host確認も無ければ拒否)
 pass_setup g22 "host,grok"
 write_ext_confirm "$T" 000 grok 95 "$FB1"
 rm -f "$T/turn-000-eval-confirm-grok.fresh"
 OUT=$(run_hook "$D" g22)
 if has "$(reason_of "$OUT")" "confirmation eval not found" && [ "$(jq -r '.active' "$S")" = "true" ]; then
-  ok "G22 fresh証明なしの外部確認 → 失敗扱いで拒否"; else bad "G22"; fi
+  ok "G22 整合マーカーなしの外部確認 → 失敗扱いで拒否"; else bad "G22"; fi
 
-# CJ1: confirm-judges.sh ランナー (stub CLI 注入) — 成功で .json + .fresh、失敗で .failed
+# G23: モデル設定を指紋記録後に変更 → 拒否
+pass_setup g23 "host,grok"
+jq '.judge_models={"grok":"grok-4.6"}' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+write_ext_confirm "$T" 000 grok 91 "$FB1"
+OUT=$(run_hook "$D" g23)
+if has "$(reason_of "$OUT")" "changed mid-loop"; then ok "G23 judge model改ざん → 拒否 (指紋)"; else bad "G23"; fi
+
+# CJ1: confirm-judges.js ランナー (stub CLI 注入) — 成功で .json + 整合マーカー、失敗で .failed
 STUB="$TMP/stubbin"; mkdir -p "$STUB"
 cat > "$STUB/grok-ok" <<'STUBEOF'
 #!/bin/bash
@@ -384,13 +391,13 @@ STUBEOF
 chmod +x "$STUB/grok-ok" "$STUB/grok-ng"
 pass_setup cj1 "host,grok"
 R1=""; R2=""
-OUT=$(GROK_BIN="$STUB/grok-ok" bash "$P/scripts/confirm-judges.sh" "$S" 2>&1)
-if has "$OUT" "JUDGE:grok SCORE:91" && has "$OUT" "RESULT:OK" \
+OUT=$(YT_JUDGE_GROK_BIN="$STUB/grok-ok" node "$P/scripts/confirm-judges.js" "$S" 2>&1)
+if has "$OUT" "JUDGE:grok MODEL:" && has "$OUT" "SCORE:91" && has "$OUT" "RESULT:OK" \
    && [ -f "$T/turn-000-eval-confirm-grok.json" ] && [ -f "$T/turn-000-eval-confirm-grok.fresh" ]; then R1="ok"; fi
-OUT=$(GROK_BIN="$STUB/grok-ng" bash "$P/scripts/confirm-judges.sh" "$S" 2>&1)
-if has "$OUT" "JUDGE:grok FAILED" && has "$OUT" "RESULT:ALL_FAILED" \
+OUT=$(YT_JUDGE_GROK_BIN="$STUB/grok-ng" node "$P/scripts/confirm-judges.js" "$S" 2>&1)
+if has "$OUT" "JUDGE:grok MODEL:" && has "$OUT" "FAILED:" && has "$OUT" "RESULT:ALL_FAILED" \
    && [ -f "$T/turn-000-eval-confirm-grok.failed" ] && [ ! -f "$T/turn-000-eval-confirm-grok.json" ]; then R2="ok"; fi
-if [ "$R1$R2" = "okok" ]; then ok "CJ1 confirm-judges.sh 成功/失敗の成果物"; else bad "CJ1 ($R1/$R2)"; fi
+if [ "$R1$R2" = "okok" ]; then ok "CJ1 confirm-judges.js 成功/失敗の成果物"; else bad "CJ1 ($R1/$R2)"; fi
 
 # --- V1-V4: validate-eval ------------------------------------------------------
 SCHEMA="$P/skills/assign-yt-script-evaluator/eval-schema.json"
@@ -434,4 +441,4 @@ if [ "$FAIL" -ne 0 ]; then
   echo "guard-tests: FAILED" >&2
   exit 1
 fi
-echo "guard-tests: ok (G1-G22, CJ1, V1-V6, J1-J4)"
+  echo "guard-tests: ok (G1-G23, CJ1, V1-V6, J1-J4)"

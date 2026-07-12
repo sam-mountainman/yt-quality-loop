@@ -130,19 +130,22 @@ bash <このスキルのディレクトリ>/scripts/loop-judge.sh "$RUN_DIR" NNN
 ユーザーが `judges:` を指定した場合 (または auto を求めた場合)、ループ開始時に候補を検出して state に記録しておく:
 
 ```bash
-bash <このスキルのディレクトリ>/scripts/confirm-judges.sh --detect
-# 検出結果 (fable/codex/grok) から、周回採点と同じベンダーを除いた構成を記録する
-# (Codex 上なら codex を除外、Claude 系エージェント上なら fable を除外)
-jq '.judges="host,fable,grok"' "$RUN_DIR/state.json" > "$RUN_DIR/state.json.tmp" && mv "$RUN_DIR/state.json.tmp" "$RUN_DIR/state.json"
+node <このスキルのディレクトリ>/scripts/confirm-judges.js --configure "$RUN_DIR/state.json" \
+  --selection "<auto またはユーザー指定>" \
+  --host-vendor "<codex|claude|grok|other>"
 ```
+
+`auto` は検出済みの別ベンダーだけを採用する。明示指定した不在CLIは構成から黙って消さず、`.failed` と最終報告に残す。Codex/GrokのモデルIDを解決できない場合は `configured-unpinned` と開示し、固定済みとは扱わない。
+
+現在のホストと同じベンダーを除外し、利用するCLIとモデル設定をstateへ記録する。Claudeジャッジの既定モデルは `fable`。Codexはconfig、Grokはモデル一覧から設定済みモデルを解決する。上書きする場合は開始前に `YT_JUDGE_CODEX_MODEL` / `YT_JUDGE_GROK_MODEL` を設定する。
 
 STOP (合格) が出たら、応答を終える前に外部ベンダーの確認採点を取る:
 
 ```bash
-bash <このスキルのディレクトリ>/scripts/confirm-judges.sh "$RUN_DIR/state.json"
+node <このスキルのディレクトリ>/scripts/confirm-judges.js "$RUN_DIR/state.json"
 ```
 
-- `JUDGE:<name> SCORE:<n>` の行を**そのまま Step 4 の最終報告に開示する** (点数の書き換え・省略は禁止)
+- `JUDGE:<name> MODEL:<model> SCORE:<n>` の行を**そのまま Step 4 の最終報告に開示する** (点数・モデルの書き換えや省略は禁止)
 - 外部スコアの最小値が threshold 未満なら「外部確認では不合格 — 公開前に手直し推奨」と明記する。合格の格は下がるが、judge の STOP 判定自体は覆さない
 - `FAILED` があった場合も降格として開示する。**この環境の judges は開示ベース** (hook 版のような機械強制はない) — だからこそ結果を必ず報告に含める
 

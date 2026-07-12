@@ -55,6 +55,7 @@ version_of() {
     jq) "$path" --version 2>/dev/null | head -1 ;;
     codex) "$path" --version 2>/dev/null | head -1 ;;
     claude) "$path" --version 2>/dev/null | head -1 ;;
+    grok) "$path" --version 2>/dev/null | head -1 ;;
     gemini) "$path" --version 2>/dev/null | head -1 ;;
     agy) "$path" --version 2>/dev/null | head -1 ;;
     cursor) "$path" --version 2>/dev/null | head -1 ;;
@@ -75,12 +76,12 @@ section() {
 }
 
 section "Host commands"
-for cmd in node jq gh claude codex cursor agy gemini; do
+for cmd in node jq gh claude codex grok cursor agy gemini; do
   print_cmd "$cmd"
 done
 
 section "Versions"
-for cmd in node jq gh claude codex cursor agy gemini; do
+for cmd in node jq gh claude codex grok cursor agy gemini; do
   v="$(version_of "$cmd")"
   if [ -n "${v:-}" ]; then
     printf '%-8s %s\n' "$cmd" "$v"
@@ -117,6 +118,13 @@ printf 'codex-plugin      %s\n' "$(manifest_version codex-plugin/.codex-plugin/p
 printf 'cursor-plugin     %s\n' "$(manifest_version cursor-plugin/.cursor-plugin/plugin.json)"
 printf 'antigravity       %s\n' "$(manifest_version antigravity-plugin/plugin.json)"
 printf 'gemini-compat     %s\n' "$(manifest_version antigravity-plugin/gemini-extension.json)"
+
+section "External judge candidates"
+if [ -f plugins/yt-quality-loop/scripts/confirm-judges.js ] && command -v node >/dev/null 2>&1; then
+  node plugins/yt-quality-loop/scripts/confirm-judges.js --detect --json
+else
+  printf 'SKIP Node judge runner not available\n'
+fi
 
 section "Static package checks"
 if [ -x scripts/validate-packages.sh ]; then
@@ -167,7 +175,7 @@ fi
 section "Manual checks still required"
 printf '%s\n' '- Cursor GUI: load cursor-plugin/.cursor-plugin/plugin.json and confirm skill + agent visibility.'
 printf '%s\n' '- Antigravity GUI: load antigravity-plugin/plugin.json and confirm skill + agent visibility.'
-printf '%s\n' '- Windows native GUI: confirm the host loads plugin hooks and can run node scripts/yt-loop.js.'
+printf '%s\n' '- Windows native GUI: confirm the host loads plugin hooks and can run yt-loop.js + confirm-judges.js.'
 printf '%s\n' '- Separate machine rehearsal: clone or unzip, then run validate + one yt-loop smoke path.'
 
 printf '\nprobe-agent-platforms: done\n'

@@ -10,6 +10,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { spawnSync } = require("child_process");
 
 const SCRIPT_DIR = __dirname;
 
@@ -360,6 +361,8 @@ function fingerprintValue(stateFile) {
     state.evaluator_skill,
     state.evaluator_runtime || "skill",
     state.judges || "host",
+    state.host_vendor || "other",
+    state.judge_models || {},
     state.max_iterations,
     state.brief_file,
     state.anchors_file,
@@ -593,13 +596,13 @@ Next actions (do all in ONE response, then end it):
         verifyFail = "anchors_file is not set — 自由 criteria は採点アンカー (90/75の目盛り) を起草・固定してから回す";
       }
     }
-    // 確認採点。judges に外部ジャッジ (fable/codex/grok) があれば確認採点の席は外部ベンダーが担う:
+    // 確認採点。judges に外部ジャッジ (claude/codex/grok) があれば確認採点の席は外部ベンダーが担う:
     //   有効な外部採点 1 つ → min 規則の席替え / 2 つ以上 → 下側中央値 (2/3 合意)。採用は min(本採点, 集計)。
     //   外部が全滅した時だけ host フォーク確認に降格 (開示付き。fail-open しない)。
     let finalScore = evalScore;
     let judgeNote = "";
     const judgesConf = String(state.judges || "host");
-    const extList = ["fable", "codex", "grok"].filter((j) => (`,${judgesConf},`).includes(`,${j},`));
+    const extList = ["claude", "codex", "grok"].filter((j) => (`,${judgesConf},`).includes(`,${j},`));
     const extScores = [];
     const extFailed = [];
     if (!verifyFail && extList.length > 0) {
@@ -609,7 +612,7 @@ Next actions (do all in ONE response, then end it):
         const fj = path.join(turnsDir, `turn-${nnn}-eval-confirm-${j}.failed`);
         if (fileExists(cj)) {
           if (!fileExists(mj) || readText(mj).trim() !== sha256File(cj)) {
-            extFailed.push(`${j}:fresh証明なし`);
+            extFailed.push(`${j}:整合マーカーなし`);
           } else if (sha256File(evalFile) === sha256File(cj)) {
             extFailed.push(`${j}:本採点のコピー`);
           } else if (validateEvalData(cj, getSchemaFile(evalSkill), threshold, criteria).length > 0) {
@@ -622,7 +625,7 @@ Next actions (do all in ONE response, then end it):
         } else if (fileExists(fj)) {
           extFailed.push(`${j}:${readText(fj).replace(/\n/g, " ").slice(0, 60)}`);
         } else {
-          verifyFail = `external confirmation for judge '${j}' not found — 合格主張の前に confirm-judges.sh を実行する (fail-open はしない)`;
+          verifyFail = `external confirmation for judge '${j}' not found — 合格主張の前に confirm-judges.js を実行する (fail-open はしない)`;
           break;
         }
       }
@@ -800,6 +803,9 @@ function loopStart(args) {
     evaluator_skill: "assign-yt-evaluator",
     evaluator_runtime: "skill",
     judges: "host",
+    judges_detected: "",
+    host_vendor: "other",
+    judge_models: {},
     latest_score: null,
     evaluated_iteration: null,
     eval_repair_attempts: 0,
@@ -851,7 +857,7 @@ function hookPromptSubmit() {
     let msg = `YT_LOOP_SESSION_ID=${sessionId}`;
     const state = readJson(stateFile, null);
     if (state && state.active === true) {
-      msg += ` | YT loop active (iteration ${state.iteration}/${state.max_iterations}, score: ${state.latest_score == null ? "none" : state.latest_score}/100, target: ${state.threshold || 90}).`;
+      msg += ` | YT loop active (iteration ${state.iteration}/${state.max_iterations}, score: ${state.latest_score == null ? "none" : state.latest_score}/100, target: ${state.threshold == null ? 90 : state.threshold}).`;
       try {
         const ageMin = Math.floor((Date.now() - fs.statSync(stateFile).mtimeMs) / 60000);
         if (ageMin >= 30) {
@@ -942,7 +948,7 @@ function finalReport(args) {
   const bestIter = state.best_iteration;
   const bestScore = state.best_score;
   const endedReason = state.ended_reason || "unknown";
-  const threshold = state.threshold || 90;
+  const threshold = state.threshold == null ? 90 : state.threshold;
   const criteria = state.criteria || "";
   const evalSkill = state.evaluator_skill || "";
   const evalRuntime = state.evaluator_runtime || "skill";
@@ -970,6 +976,7 @@ function finalReport(args) {
   out.push(`- Evaluator: ${evalSkill} (runtime: ${evalRuntime})`);
   if (briefFile && briefFile !== "null") out.push(`- Brief: ${briefFile}`);
   if (anchorsFile && anchorsFile !== "null") out.push(`- Anchors: ${anchorsFile} (次回同じ軸なら anchors: 指定で再利用可)`);
+  if (state.judges_unavailable) out.push(`- ⚠ ループ開始時に不在だった明示ジャッジ: ${state.judges_unavailable}`);
 
   const verifyFails = [];
   if (Number.isInteger(bestIter)) {
@@ -990,7 +997,7 @@ function finalReport(args) {
       // 確認採点の実在: 外部ジャッジ (judges) の有効な確認があればそれで足りる
       const judgesConf = String(state.judges || "host");
       let extConfOk = false;
-      for (const j of ["fable", "codex", "grok"]) {
+      for (const j of ["claude", "codex", "grok"]) {
         if (!(`,${judgesConf},`).includes(`,${j},`)) continue;
         const cj = path.join(turnsDir, `turn-${nnn}-eval-confirm-${j}.json`);
         const mj = path.join(turnsDir, `turn-${nnn}-eval-confirm-${j}.fresh`);
@@ -1070,9 +1077,14 @@ function finalReport(args) {
   if (rJudges !== "host" || jc) {
     out.push("", "## 確認採点 (judges)", "");
     out.push(`- 構成: ${rJudges}`);
+    const models = state.judge_models && typeof state.judge_models === "object" ? state.judge_models : {};
+    for (const [provider, model] of Object.entries(models)) out.push(`- ${provider} model: ${model || "configured-unpinned"}`);
+    if (Object.values(models).some((model) => model === "configured-unpinned")) {
+      out.push("- ⚠ configured-unpinned はCLI既定モデルを使ったため、モデルIDを固定・検証できていません");
+    }
     const jd = String(state.judges_detected || "");
     if (jd && jd !== "null") {
-      for (const j of ["fable", "codex", "grok"]) {
+      for (const j of ["claude", "codex", "grok"]) {
         if ((`,${jd},`).includes(`,${j},`) && !(`,${rJudges},`).includes(`,${j},`)) {
           out.push(`- ${j}: 検出済みだが不使用 (ユーザー指定)`);
         }
@@ -1081,9 +1093,10 @@ function finalReport(args) {
     if (jc && jc.rule) {
       out.push(`- 判定規則: ${jc.rule} / 外部スコア: ${jc.ext_scores || "-"} / 採用スコア: ${jc.adopted === undefined ? "-" : jc.adopted}`);
       if (jc.failed) out.push(`- ⚠ 失敗したジャッジ: ${jc.failed}`);
-      if (jc.rule === "median") out.push("- 合格の確からしさ: ★3 (本採点 + 外部2ベンダー以上の下側中央値合意)");
-      else if (jc.rule === "min") out.push("- 合格の確からしさ: ★2 (本採点 + 外部1ベンダーの min 採用)");
-      else if (jc.rule === "host-degraded") out.push("- ⚠ 外部ジャッジ全滅のため host フォーク確認に降格 (合格の確からしさ: ★1 = 単独ベンダー相当)");
+      if (jc.rule === "median") out.push("- 確認レベル: 3 (本採点 + 外部2ベンダー以上の下側中央値)");
+      else if (jc.rule === "min") out.push("- 確認レベル: 2 (本採点 + 外部1ベンダーの min 採用)");
+      else if (jc.rule === "host-degraded") out.push("- ⚠ 外部ジャッジ全滅のため host 確認に降格 (確認レベル: 1)");
+      out.push("- 注: 確認レベルは採点経路の多様性であり、台本品質や再生数の確率ではありません。");
       const extNums = String(jc.ext_scores || "").split(/\s+/).filter((s) => /^[0-9]+$/.test(s)).map(Number);
       if (extNums.length >= 2) {
         const spread = Math.max(...extNums) - Math.min(...extNums);
@@ -1121,7 +1134,7 @@ function parseFlagArgs(args) {
 
 function stateConfig(args) {
   const stateFile = args[0];
-  if (!stateFile) throw new Error("usage: state-config <state_file> [--task ...] [--criteria ...] [--evaluator ...] [--evaluator-runtime skill|fable] [--judges host[,fable][,codex][,grok]] [--generator ...] [--brief ...] [--anchors ...] [--runtime ...]");
+  if (!stateFile) throw new Error("usage: state-config <state_file> [--task ...] [--criteria ...] [--evaluator ...] [--evaluator-runtime skill|fable] [--judges host[,claude][,codex][,grok]] [--judge-models <json>] [--host-vendor ...] [--generator ...] [--brief ...] [--anchors ...] [--runtime ...]");
   const flags = parseFlagArgs(args.slice(1));
   const state = readJson(stateFile, {});
   if (Object.prototype.hasOwnProperty.call(flags, "task")) state.task = flags.task;
@@ -1130,6 +1143,11 @@ function stateConfig(args) {
   if (Object.prototype.hasOwnProperty.call(flags, "evaluatorRuntime")) state.evaluator_runtime = flags.evaluatorRuntime || "skill";
   if (Object.prototype.hasOwnProperty.call(flags, "judges")) state.judges = flags.judges || "host";
   if (Object.prototype.hasOwnProperty.call(flags, "judgesDetected")) state.judges_detected = flags.judgesDetected || "";
+  if (Object.prototype.hasOwnProperty.call(flags, "hostVendor")) state.host_vendor = flags.hostVendor || "other";
+  if (Object.prototype.hasOwnProperty.call(flags, "judgeModels")) {
+    try { state.judge_models = JSON.parse(flags.judgeModels || "{}"); }
+    catch { throw new Error("--judge-models must be valid JSON"); }
+  }
   if (Object.prototype.hasOwnProperty.call(flags, "generator")) state.generator_skill = flags.generator;
   if (Object.prototype.hasOwnProperty.call(flags, "brief")) state.brief_file = flags.brief ? flags.brief : null;
   if (Object.prototype.hasOwnProperty.call(flags, "anchors")) state.anchors_file = flags.anchors ? flags.anchors : null;
@@ -1212,6 +1230,16 @@ function platformDoctor() {
   } else {
     console.log("- Unix control plane: OK for Bash scripts");
     console.log("- Node control plane: OK");
+  }
+  const judgeRunner = path.join(SCRIPT_DIR, "confirm-judges.js");
+  if (fileExists(judgeRunner)) {
+    const detected = spawnSync(process.execPath, [judgeRunner, "--detect", "--json"], { encoding: "utf8", timeout: 15000 });
+    let providers = [];
+    if (detected.status === 0) {
+      try { providers = JSON.parse(detected.stdout || "[]"); } catch { providers = []; }
+    }
+    const available = providers.filter((x) => x.available).map((x) => `${x.provider}(${x.model})`);
+    console.log(`- external judges: ${available.length > 0 ? available.join(", ") : "none (optional)"}`);
   }
 }
 

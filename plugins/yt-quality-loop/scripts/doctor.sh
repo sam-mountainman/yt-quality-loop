@@ -92,10 +92,10 @@ fi
 
 # 外部確認ジャッジ (任意 — 合格時の確認採点を他社モデルに回す "judges" 機能)
 SCRIPT_DIR_J="$(cd "$(dirname "$0")" && pwd)"
-if [ -f "$SCRIPT_DIR_J/confirm-judges.sh" ]; then
-  DETECTED="$(bash "$SCRIPT_DIR_J/confirm-judges.sh" --detect 2>/dev/null | tr '\n' ' ' | sed 's/ $//')"
+if [ -f "$SCRIPT_DIR_J/confirm-judges.js" ]; then
+  DETECTED="$(node "$SCRIPT_DIR_J/confirm-judges.js" --detect 2>/dev/null | tr '\n' ' ' | sed 's/ $//')"
   if [ -n "$DETECTED" ]; then
-    echo "○ 外部確認ジャッジ候補: $DETECTED (fable=claude CLI / codex=codex CLI / grok=grok CLI)"
+    echo "○ 外部確認ジャッジ候補: $DETECTED (claude / codex / grok CLI。実モデルはループ開始時に固定・開示)"
     echo "  使い方: /yt-loop ... judges: auto で、合格時の確認採点を周回採点と別ベンダーが担当します"
   else
     echo "△ 外部確認ジャッジ候補: なし (任意。claude / codex / grok CLI を入れると合格の門番を多ベンダー化できる)"

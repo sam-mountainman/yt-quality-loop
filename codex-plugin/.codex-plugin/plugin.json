@@ -1,6 +1,6 @@
 {
   "name": "yt-quality-loop",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "YouTube向け成果物 (台本 / ショート / タイトル・サムネ案 / 企画) を、品質スコアが合格点に達するまで自動改善ループで磨き込むスキル。続行/終了はNode/Bash制御プレーンの整数比較が判定する。",
   "author": {
     "name": "Masa",
@@ -14,7 +14,6 @@
     "loop-engineering"
   ],
   "skills": "./skills/",
-  "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "YT Quality Loop",
     "shortDescription": "YouTube台本や企画を品質ループで磨き込む",

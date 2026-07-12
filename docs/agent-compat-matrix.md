@@ -1,6 +1,6 @@
 # Agent Compatibility Matrix
 
-Last checked: 2026-07-09
+Last checked: 2026-07-13
 
 This document is the source of truth for what this repository assumes about Claude Code, Codex, Cursor, and Antigravity. Do not rely on an AI agent's memory when changing cross-agent packaging. Check the official docs, update the checked date, and record what was actually tested.
 
@@ -9,7 +9,7 @@ This document is the source of truth for what this repository assumes about Clau
 | Host | Package surface | Skills | Agents / subagents | Hooks | This repo's package | Recommended mode |
 |---|---|---|---|---|---|---|
 | Claude Code | Claude plugin | Yes | Subagents via Claude Code/plugin surfaces | Yes | `plugins/yt-quality-loop/` | Primary hook-driven loop |
-| Codex | Codex plugin with `.codex-plugin/plugin.json` | Yes | Custom subagents | Yes, but trust/UI behavior must be verified per host | `codex-plugin/` | `$yt-loop` fallback is the stable path; `$yt-loop-hook` is optional |
+| Codex | Codex plugin with `.codex-plugin/plugin.json` | Yes | Custom subagents | Yes; non-managed hooks require trust | `codex-plugin/` | `$yt-loop-hook` is the deterministic-gate path; `$yt-loop` is the no-hook fallback |
 | Cursor | Cursor plugin / skills / agents | Yes | Subagents | Yes | `cursor-plugin/` | Skill fallback path; verify GUI plugin load |
 | Antigravity | Antigravity plugin | Yes | Subagents | Platform-dependent; do not assume Claude/Codex hook parity | `antigravity-plugin/` | Skill fallback path; verify GUI or `agy` where available |
 
@@ -20,7 +20,7 @@ This document is the source of truth for what this repository assumes about Clau
 | macOS | Verified static + deterministic E2E | Bash compatibility path and Node control plane are both tested locally. |
 | Linux | Supported by design | Same Bash/Node assumptions as macOS; verify in CI before claiming a specific distro. |
 | Windows WSL | Supported by design | Use the Bash compatibility path inside Ubuntu/WSL (`jq` required for Bash scripts). |
-| Windows native (PowerShell/cmd) | Supported for the control plane | Hooks, state updates, eval validation, mechanical checks, fingerprinting, and final report use `scripts/yt-loop.js` without Bash/jq. GUI host loading still needs real app verification. |
+| Windows native (PowerShell/cmd) | Supported for the control plane | Hooks, state updates, eval validation, mechanical checks, fingerprinting, final report, and multi-vendor judge execution use Node without Bash/jq. GUI host loading still needs real app verification. |
 
 ## Optional Fable Integration
 
@@ -34,7 +34,7 @@ This document is the source of truth for what this repository assumes about Clau
 
 | Host | Sources |
 |---|---|
-| Codex | [Build plugins](https://developers.openai.com/codex/plugins/build), [Hooks](https://developers.openai.com/codex/hooks), [Subagents](https://developers.openai.com/codex/subagents) |
+| Codex | [Build plugins](https://learn.chatgpt.com/docs/build-plugins), [Hooks](https://learn.chatgpt.com/docs/hooks), [Subagents](https://developers.openai.com/codex/subagents) |
 | Cursor | [Skills](https://cursor.com/docs/skills), [Hooks](https://cursor.com/docs/hooks), [Subagents](https://cursor.com/docs/subagents) |
 | Antigravity | [Plugins](https://antigravity.google/docs/cli/plugins), [Skills](https://antigravity.google/docs/skills), [Subagents](https://antigravity.google/docs/cli/subagents) |
 | Fable MCP | [sam-mountainman/fable-mcp](https://github.com/sam-mountainman/fable-mcp) |
@@ -55,7 +55,9 @@ Static compatibility is enough to ship an experimental package, but not enough t
 - Codex plugins can package skills, hooks, and custom subagents.
 - Plugin hooks must be trusted by the host before execution. Installing/enabling a plugin is not the same as trusting its hooks.
 - This repo keeps `$yt-loop` as the stable fallback. `$yt-loop-hook` must detect missing hook context and fall back safely.
-- Historical local measurement in this repo found Codex CLI hook non-firing in some `codex exec` and interactive CLI paths. Treat hook support as host-version-dependent and probe before promising unattended hook behavior.
+- Historical local measurement on CLI 0.132.0 found non-firing hooks. On 2026-07-13, CLI 0.144.1 `codex exec --dangerously-bypass-hook-trust` fired the Stop hook. Treat the old result as historical; current official docs and current-version probes take precedence.
+- The installed v1.7.1 plugin bundle was also exercised: UserPromptSubmit injected the real session id and Codex emitted Stop hook events in the same `codex exec` run.
+- Multi-vendor judges use the cross-platform Node runner. Claude defaults to model alias `fable`; Codex/Grok resolve and pin a CLI model id when possible. Unresolved defaults are disclosed as `configured-unpinned`, not presented as pinned. Explicitly requested but unavailable providers remain visible as failed judges. MCP servers are optional reviewer/evaluator integrations, not the deterministic judge runner.
 
 ### Cursor
 

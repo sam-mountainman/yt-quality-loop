@@ -19,6 +19,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$ROOT/codex/skills/yt-loop"
 [ -d "$SRC" ] || { echo "ERROR: source not found: $SRC"; exit 1; }
 
+# confirm-judges is shared by the hook and hookless skill paths. Keep one
+# implementation source under the Claude/Codex hook control-plane scripts.
+cp "$ROOT/plugins/yt-quality-loop/scripts/confirm-judges.js" "$SRC/scripts/confirm-judges.js"
+cp "$ROOT/plugins/yt-quality-loop/scripts/confirm-judges.sh" "$SRC/scripts/confirm-judges.sh"
+
 for pkg in codex-plugin cursor-plugin antigravity-plugin; do
   DEST="$ROOT/$pkg/skills/yt-loop"
   rm -rf "$DEST"

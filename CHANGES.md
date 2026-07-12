@@ -13,6 +13,19 @@
 | 対象ユーザー | エンジニア (自分用) | **非エンジニアの YouTube 運営者** |
 | Codex 対応 | evaluator の一部として利用 | **スキル + 無人ランナーとして全面対応** |
 
+## v1.7.1 の修正 (多ベンダー確認採点の正確性・Windows・Codex hook)
+
+- `fable` というジャッジ名を `claude` providerへ修正。従来実装は `claude` CLIをモデル指定なしで呼んでおり、Fable 5とは限らなかった。新実装はClaudeジャッジで既定 `--model fable` を明示する
+- Codex/Grokは利用者のCLI設定からモデルIDを解決し、`YT_JUDGE_*_MODEL` で明示固定できる。選択モデルはstate・指紋・最終報告へ記録し、解決不能時は `configured-unpinned` と開示する
+- `confirm-judges.js` をNode正本として追加。Bash/Perl/jq依存、長大プロンプトのargv渡し、Windowsネイティブ非対応を解消した。旧 `confirm-judges.sh` はNode wrapperとして維持
+- 外部CLIはツール無効で起動し、Codexはread-only sandboxを指定する。成果物内指示からローカルファイルを変更するリスクを縮小した
+- `.fresh` を「ベンダーの証明」と呼ぶ表現を撤回。内容ハッシュの整合マーカーであり、同一ローカル権限内のトリップワイヤにすぎないことを明記した
+- 「合格の確からしさ★」を「確認レベル」へ変更。経路の多様性は品質や再生数の確率ではないため
+- Codex CLI 0.144.1で `codex exec` のStop hook発火を再実測。0.132.0の未発火結果を恒久仕様のように扱っていた説明を修正した
+- Windowsのnpm製 `.cmd` CLI shimをNodeから起動できるようにし、Windows CIで実行経路を検証する。hookなし経路で `task.md` / `criteria-anchors.md` が外部採点へ渡らない配線漏れも修正した
+- 明示指定した不在ジャッジを構成から黙って落とさず `.failed` と最終報告へ残す。モデルIDを解決できない場合は `configured-unpinned` と開示し、固定済みと誤認させない
+- `threshold: 0` を falsy として90へ戻していたNode制御プレーンの既定値処理を修正した
+
 ## v1.6.6 の追加 (Windows ネイティブ制御プレーン)
 
 - `plugins/yt-quality-loop/scripts/yt-loop.js` を追加。Bash / jq / mktemp / stat / shasum に依存せず、loop start、Stop hook 判定、UserPromptSubmit 注入、eval 検証、機械チェック、指紋、final report、cancel、fresh marker、state 更新を Node だけで実行できる

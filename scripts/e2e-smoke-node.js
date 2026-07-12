@@ -17,7 +17,19 @@ function runNode(pluginRoot, args, options = {}) {
   const result = spawnSync(process.execPath, [script, ...args], {
     input: options.input || undefined,
     encoding: "utf8",
-    env: { ...process.env, PLUGIN_ROOT: pluginRoot, CLAUDE_PLUGIN_ROOT: pluginRoot },
+    env: { ...process.env, ...options.env, PLUGIN_ROOT: pluginRoot, CLAUDE_PLUGIN_ROOT: pluginRoot },
+  });
+  if (result.status !== 0) {
+    throw new Error(`node ${script} ${args.join(" ")} failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  }
+  return result.stdout;
+}
+
+function runJudge(pluginRoot, args, options = {}) {
+  const script = path.join(pluginRoot, "scripts", "confirm-judges.js");
+  const result = spawnSync(process.execPath, [script, ...args], {
+    encoding: "utf8",
+    env: { ...process.env, ...options.env, PLUGIN_ROOT: pluginRoot, CLAUDE_PLUGIN_ROOT: pluginRoot },
   });
   if (result.status !== 0) {
     throw new Error(`node ${script} ${args.join(" ")} failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
@@ -63,6 +75,25 @@ function smoke(pluginRoot) {
       "",
     ].join("\n"), "utf8");
 
+    const judgeStub = path.join(tmp, "judge-stub.js");
+    fs.writeFileSync(judgeStub, [
+      "const fs = require('fs');",
+      "if (process.argv.includes('--version')) { console.log('judge-stub 1.0'); process.exit(0); }",
+      "const promptIndex = process.argv.indexOf('--prompt-file');",
+      "if (process.env.YT_JUDGE_STUB_CAPTURE && promptIndex >= 0) fs.writeFileSync(process.env.YT_JUDGE_STUB_CAPTURE, fs.readFileSync(process.argv[promptIndex + 1], 'utf8'));",
+      "console.log(JSON.stringify({score:92,quality:{overall:92,breakdown:{'冒頭フック':91,'構成の明確さ':93,'具体性と信頼性':92}},feedback:'独立確認では冒頭の悩み提示と結論先行が明確です。具体例も含まれています。注意点に根拠を一文追加すればさらに堅くなりますが、公開前の基準には達しています。',evaluator_skill:'subagent-fresh-eval'}));",
+      "",
+    ].join("\n"), "utf8");
+    const judgeCmd = path.join(tmp, "judge-stub.cmd");
+    if (process.platform === "win32") {
+      fs.writeFileSync(judgeCmd, `@echo off\r\n"${process.execPath}" "%~dp0judge-stub.js" %*\r\n`, "utf8");
+    }
+    const judgeEnv = {
+      YT_JUDGE_GROK_BIN: process.platform === "win32" ? judgeCmd : process.execPath,
+      YT_JUDGE_GROK_ARGS_JSON: JSON.stringify(process.platform === "win32" ? [] : [judgeStub]),
+      YT_JUDGE_GROK_MODEL: "grok-test",
+    };
+
     runNode(pluginRoot, [
       "state-config",
       stateFile,
@@ -77,6 +108,9 @@ function smoke(pluginRoot) {
       "--anchors",
       anchors,
     ]);
+
+    console.log("== node configure external judge ==");
+    runJudge(pluginRoot, ["--configure", stateFile, "--selection", "host+grok", "--host-vendor", "codex"], { env: judgeEnv });
 
     runNode(pluginRoot, ["fingerprint", stateFile, "--record"]);
 
@@ -99,20 +133,6 @@ function smoke(pluginRoot) {
       feedback: "冒頭で視聴者の悩みを示し、構成も明確です。さらに実例を一つ増やすと信頼性が上がりますが、公開前の合格水準には達しています。",
       evaluator_skill: "subagent-fresh-eval",
     });
-    writeJson(path.join(turnsDir, "turn-000-eval-confirm.json"), {
-      score: 92,
-      quality: {
-        overall: 92,
-        breakdown: {
-          "冒頭フック": 91,
-          "構成の明確さ": 93,
-          "具体性と信頼性": 92,
-        },
-      },
-      feedback: "独立確認: 冒頭の悩み提示と結論先行の構成は基準どおり。注意点の項に根拠を1文足すとさらに堅くなるが、合格水準には達している。",
-      evaluator_skill: "subagent-fresh-eval",
-    });
-
     runNode(pluginRoot, [
       "state-eval-result",
       stateFile,
@@ -121,6 +141,11 @@ function smoke(pluginRoot) {
       "--artifact",
       path.join(turnsDir, "turn-000-output.md"),
     ]);
+
+    console.log("== node external judge ==");
+    const judgeOut = runJudge(pluginRoot, [stateFile], { env: judgeEnv });
+    assert(judgeOut.includes("JUDGE:grok MODEL:grok-test SCORE:92"));
+    assert(fs.existsSync(path.join(turnsDir, "turn-000-eval-confirm-grok.fresh")));
 
     console.log("== node stop hook threshold_met ==");
     const stopOut = runNode(pluginRoot, ["hook-stop"], {
@@ -138,7 +163,54 @@ function smoke(pluginRoot) {
     const reportOut = runNode(pluginRoot, ["final-report", stateFile, delivered]);
     assert(reportOut.includes(`Deliverable: ${delivered}`));
     assert(reportOut.includes("Best score: 91"));
+    assert(reportOut.includes("grok model: grok-test"));
     assert(fs.statSync(delivered).size > 0);
+
+    console.log("== node hookless context fallback ==");
+    const hooklessDir = path.join(tmp, "hookless");
+    fs.mkdirSync(hooklessDir, { recursive: true });
+    const hooklessState = path.join(hooklessDir, "state.json");
+    const uniqueTask = "HOOKLESS_TASK_FROM_TASK_MD";
+    const uniqueAnchor = "HOOKLESS_ANCHOR_FROM_DEFAULT_FILE";
+    fs.writeFileSync(path.join(hooklessDir, "task.md"), uniqueTask, "utf8");
+    fs.writeFileSync(path.join(hooklessDir, "criteria-anchors.md"), uniqueAnchor, "utf8");
+    fs.writeFileSync(path.join(hooklessDir, "turn-000-output.md"), "# hookless artifact\n", "utf8");
+    writeJson(path.join(hooklessDir, "turn-000-eval.json"), { score: 91 });
+    writeJson(hooklessState, {
+      judges: "host,grok",
+      judge_models: { grok: "grok-test" },
+      criteria: "冒頭フック,構成の明確さ,具体性と信頼性",
+      evaluator_skill: "subagent-fresh-eval",
+      threshold: 90,
+      iteration: 0,
+      evaluated_iteration: 0,
+    });
+    const capture = path.join(hooklessDir, "captured-prompt.txt");
+    runJudge(pluginRoot, [hooklessState], { env: { ...judgeEnv, YT_JUDGE_STUB_CAPTURE: capture } });
+    const capturedPrompt = fs.readFileSync(capture, "utf8");
+    assert(capturedPrompt.includes(uniqueTask), "task.md fallback missing from judge prompt");
+    assert(capturedPrompt.includes(uniqueAnchor), "criteria-anchors.md fallback missing from judge prompt");
+
+    console.log("== node explicit unavailable judge remains visible ==");
+    const missingBin = path.join(tmp, "definitely-missing-judge-command");
+    const unavailableEnv = { YT_JUDGE_GROK_BIN: missingBin, YT_JUDGE_GROK_MODEL: "grok-test" };
+    runJudge(pluginRoot, ["--configure", hooklessState, "--selection", "host+grok", "--host-vendor", "codex"], { env: unavailableEnv });
+    const unavailableState = readJson(hooklessState);
+    assert.strictEqual(unavailableState.judges, "host,grok");
+    assert.strictEqual(unavailableState.judges_unavailable, "grok");
+    const unavailableOut = runJudge(pluginRoot, [hooklessState], { env: unavailableEnv });
+    assert(unavailableOut.includes("JUDGE:grok MODEL:grok-test FAILED:CLI not found"));
+    assert(fs.existsSync(path.join(hooklessDir, "turn-000-eval-confirm-grok.failed")));
+    const unavailableReport = runNode(pluginRoot, ["final-report", hooklessState]);
+    assert(unavailableReport.includes("ループ開始時に不在だった明示ジャッジ: grok"));
+
+    console.log("== node threshold zero remains zero ==");
+    const zeroDir = path.join(tmp, "threshold-zero");
+    fs.mkdirSync(zeroDir, { recursive: true });
+    const zeroStart = runNode(pluginRoot, ["loop-start", zeroDir, "1", "0", `${sid}-zero`]);
+    const zeroState = zeroStart.split(/\r?\n/).find((line) => line.startsWith("State file:")).replace(/^State file:\s*/, "");
+    const zeroReport = runNode(pluginRoot, ["final-report", zeroState]);
+    assert(zeroReport.includes("- Threshold: 0"));
 
     console.log("== node hook prompt submit ==");
     const promptOut = runNode(pluginRoot, ["hook-prompt-submit"], {

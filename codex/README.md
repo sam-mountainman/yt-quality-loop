@@ -2,7 +2,7 @@
 
 Claude Code 以外の 3 環境向けのガイドです。ループの仕組みは共通: **作る → 採点 (まっさらな別の頭) → シェルの整数比較で続行判定**。
 
-2026-07-06 時点で確認した前提:
+2026-07-13 時点で確認した前提:
 
 - **Codex**: プラグインは `codex-plugin/.codex-plugin/plugin.json`、skills、hooks を同梱できる。Stop hook は `decision: "block"` で継続プロンプトを作れるため、Claude Code 版に近い hook 駆動ループを実装済み。
 - **Cursor**: `.cursor-plugin/plugin.json` で `skills` と `agents` を指す形式。公式サンプルに合わせて manifest と採点 agent を同梱。
@@ -28,7 +28,9 @@ Codex には 2 つの使い方があります。
 
 Codex の plugin hooks は、インストール/有効化だけでは自動信頼されません。Codex の hook UI または `/hooks` 相当の確認画面で `yt-quality-loop` の hook 定義を確認して信頼してください。信頼しない場合は `$yt-loop` を使います。
 
-**実測 (2026-07-06, v0.132.0)**: `codex exec` (非対話) では hook が発火しません (`--dangerously-bypass-hook-trust` 付きでも、plugin/リポジトリ hook とも)。その場合も `$yt-loop-hook` は plugin root 不在を検知して **`$yt-loop` に自動フォールバックし、納品まで完走することを実 Codex で確認済み** (自己採点だった場合は開示されます)。hook 駆動が使えるのは対話モードのみと考えてください (対話モードの発火は未検証 — docs/e2e-checklist.md 参照)。exec / 自動化では最初から `$yt-loop` か無人ランナーを使います。
+**実測 (2026-07-13, Codex CLI 0.144.1)**: `codex exec --dangerously-bypass-hook-trust` で Stop hook の発火を確認済みです。通常利用では `/hooks` でplugin hookを確認・信頼してください。0.132.0で未発火だった過去結果は現行仕様の根拠にしません。hookが無効・未信頼・管理ポリシーで禁止されている場合だけ `$yt-loop` または無人ランナーへフォールバックします。
+
+多ベンダー確認はNodeランナーが `claude` / `codex` / `grok` CLIをツール無効・読み取り専用相当で呼びます。Claudeジャッジは既定でFableモデルを明示し、Codex/GrokはCLI設定からモデルIDを解決して固定します。解決不能時は `configured-unpinned` と開示します。確実に固定する場合は `YT_JUDGE_CLAUDE_MODEL` / `YT_JUDGE_CODEX_MODEL` / `YT_JUDGE_GROK_MODEL` をループ開始前に設定します。明示したCLIが不在でも構成から消さず、失敗として報告します。
 
 Codex custom agent を直接使いたい場合は、フォールバックインストーラが `codex/agents/yt_quality_evaluator.toml` を `~/.codex/agents/` に入れます。
 
@@ -57,11 +59,11 @@ bash codex/install-skills.sh all          # Codex(グローバル) + Cursor/Anti
 
 採点は上から順の 3 段構えです:
 
-1. **サブエージェント / custom agent (第1手段)** — Codex・Cursor・Antigravity の子エージェントを fresh context の採点係として使う。採点後に `mark-fresh.sh` で証明マーカー (`turn-NNN-eval.fresh`) を残す
+1. **サブエージェント / custom agent (第1手段)** — Codex・Cursor・Antigravity の子エージェントをfresh contextの採点係として使う。採点後に `mark-fresh.sh` で内容ハッシュの整合マーカー (`turn-NNN-eval.fresh`) を残す
 2. **codex exec 子プロセス (第2手段)** — `fresh-eval.sh` が実行し、マーカーも自動で残る
 3. **自己採点 (最終手段・原則不使用)** — 上記 2 つが使えない環境のみ。マーカーは残さない (偽造禁止) ため judge が `SELF-SCORED` と表示し、最終報告で必ず開示される。これは「Codex が普通に自己採点する」という意味ではなく、fresh 採点に落ちた時の事故開示
 
-マーカーは同一権限で動く以上「壁」ではなくトリップワイヤです。目的は「黙って自己採点で通す」を正規手順から排除することです。
+マーカーは同一権限で動く以上、ベンダー署名やセキュリティ境界ではなくトリップワイヤです。目的は「黙って自己採点で通す」を正規手順から排除することです。
 
 ## 無人実行 (最も厳密な構成)
 

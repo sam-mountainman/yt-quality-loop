@@ -284,14 +284,14 @@ if [ "$SCORE" != "null" ] && [ "$SCORE" -ge "$THRESHOLD" ] 2>/dev/null; then
     fi
   fi
   # 確認採点の実在と一致: 合格主張には独立した 2 回目の採点が必要 (ガチャ合格・省略の封鎖)
-  # judges に外部ジャッジ (fable=claude / codex / grok) がある場合、確認採点の席は外部ベンダーが担う:
+  # judges に外部ジャッジ (claude / codex / grok) がある場合、確認採点の席は外部ベンダーが担う:
   #   有効な外部採点 1 つ → min(本採点, 外部) >= threshold (現行 min 規則の席替え)
   #   有効な外部採点 2 つ以上 → 本採点+外部の下側中央値 >= threshold (2/3 合意)。採用は min(本採点, 中央値)
   # 外部が全滅 (.failed) した時だけ従来の host フォーク確認に降格する (降格は開示。fail-open はしない)。
   FINAL_SCORE="$EVAL_SCORE"
   JUDGES=$(jq -r '.judges // "host"' "$STATE_FILE" 2>/dev/null) || JUDGES="host"
   EXT_LIST=""
-  for _j in fable codex grok; do
+  for _j in claude codex grok; do
     case ",$JUDGES," in *",$_j,"*) EXT_LIST="$EXT_LIST$_j ";; esac
   done
   JUDGE_NOTE=""
@@ -306,7 +306,7 @@ if [ "$SCORE" != "null" ] && [ "$SCORE" -ge "$THRESHOLD" ] 2>/dev/null; then
       FJ="$TURNS_DIR/turn-$NNN-eval-confirm-$_j.failed"
       if [ -f "$CJ" ]; then
         if [ ! -f "$MJ" ] || [ "$(cat "$MJ" 2>/dev/null)" != "$(hash_of "$CJ")" ]; then
-          EXT_FAILED="$EXT_FAILED$_j:fresh証明なし "
+          EXT_FAILED="$EXT_FAILED$_j:整合マーカーなし "
         elif [ "$(hash_of "$EVAL_FILE")" = "$(hash_of "$CJ")" ]; then
           EXT_FAILED="$EXT_FAILED$_j:本採点のコピー "
         elif ! bash "$CONTROL_DIR/validate-eval.sh" "$CJ" "$SCHEMA_J" "$THRESHOLD" "$CRITERIA" >/dev/null 2>&1; then
@@ -322,7 +322,7 @@ if [ "$SCORE" != "null" ] && [ "$SCORE" -ge "$THRESHOLD" ] 2>/dev/null; then
       elif [ -f "$FJ" ]; then
         EXT_FAILED="$EXT_FAILED$_j:$(tr -d '\n' < "$FJ" 2>/dev/null | head -c 60) "
       else
-        VERIFY_FAIL="external confirmation for judge '$_j' not found — 合格主張の前に confirm-judges.sh を実行する (fail-open はしない)"
+        VERIFY_FAIL="external confirmation for judge '$_j' not found — 合格主張の前に confirm-judges.js を実行する (fail-open はしない)"
         break
       fi
     done

@@ -25,12 +25,13 @@
 ## 多ベンダー確認採点 (judges) ポリシー
 
 - judges は**合格ゲート専用**。周回中の採点係 (evaluator / evaluator_runtime) には触れない。周回中パネル・毎周平均は導入しない (フィードバック分裂・停滞判定破壊・コスト増のため設計却下済み)
-- ジャッジの実体は **CLI 直呼び** (fable=claude / codex=codex / grok=grok CLI、confirm-judges.sh が決定論で回す)。MCP は使わない — MCP (fable-mcp / codex-mcp / grok 系) は対話・レビュー層と evaluator_runtime の担当で、層が違う
-- auto の規則は「検出された候補から**周回採点と同じベンダーを除く**」。Claude 系ホストは fable を除外、Codex は codex を除外
+- ジャッジの実体は **Node ランナーからのCLI直呼び** (`claude` / `codex` / `grok`)。MCPは使わない。MCP (fable-mcp / codex-mcp / grok系) は対話・レビュー層と evaluator_runtime の担当で、層が違う
+- `claude` ジャッジは既定で `--model fable` を指定する。Codexはconfig、Grokは`models`出力から設定済みモデルを開始時に解決する。上書きは `YT_JUDGE_CODEX_MODEL` / `YT_JUDGE_GROK_MODEL`。解決不能時は `configured-unpinned` と開示し、固定済みと表現しない。使用モデルはstate・指紋・最終報告に含める
+- auto の規則は「検出された候補から**ホストと同じベンダーを除く**」。Claude系ホストは claude を除外、Codexは codex を除外
 - 集計は 外部 1 体 = min / 2 体以上 = 下側中央値 (2/3 合意)。採用スコアは本採点より上がらない (下げる方向にのみ動く)
-- 外部ジャッジの失敗は .failed マーカーで開示し、**fail-open しない** (全滅時は host フォーク確認に降格 + 最終報告で開示)。judges は指紋対象 — 途中変更は合格拒否 (G21)
+- 外部ジャッジの失敗は .failed で開示し、**fail-open しない** (全滅時は host 確認に降格 + 最終報告で開示)。明示指定した不在CLIを構成から黙って除外しない。judges と judge_models は指紋対象 — 途中変更は合格拒否 (G21/G23)
 - 外部ジャッジに渡してよいもの: task / 採点軸 / プロファイル / ブリーフ / アンカー / 成果物本文 / eval JSON 契約。渡さないもの: threshold / 周回数 / 過去スコア / 過去 feedback / 本採点の結果
-- 機械強制があるのは hook 経路 (loop-control.sh / yt-loop.js) のみ。skill 環境版 (`$yt-loop`) は開示ベース — この非対称は意図的な差分
+- 決定論的な合格ゲートがあるのは hook 経路 (loop-control.sh / yt-loop.js)。skill環境版 (`$yt-loop`) は開示ベース。この差は明示する。なお同じローカル権限でstate・marker・scriptを書けるため、指紋やmarkerをベンダー署名・セキュリティ境界と表現しない
 
 ## Fable 連携ポリシー
 
@@ -45,7 +46,7 @@
 
 ## 実測済みの環境注意
 
-- Codex CLI 0.132.0: exec / 対話とも plugin hook は発火しない (実測)。`$yt-loop-hook` は plugin root 不在を検知して `$yt-loop` にフォールバックする — この縮退を壊さない
+- Codex CLI 0.144.1 (2026-07-13): `codex exec --dangerously-bypass-hook-trust` で Stop hook 発火を実測。0.132.0で未発火だった記録は歴史的結果としてのみ扱う。通常は `/hooks` でplugin hookを信頼して `$yt-loop-hook` を使い、hook無効/未信頼時だけ `$yt-loop` へ縮退する
 - Node 20+ が必要な CLI (claude 等) を呼ぶスクリプトは、古い node が PATH 先頭の環境を考慮する (validate-packages.sh の Node ガード参照)
 - Windows ネイティブでは Bash/jq ではなく `plugins/yt-quality-loop/scripts/yt-loop.js` が hook / state / eval / final-report の制御プレーンになる。Bash scripts は macOS/Linux/WSL 互換経路として残すが、hook command は Node 経由を正とする
 
@@ -62,7 +63,7 @@
 - `plugins/yt-quality-loop/skills/yt-loop/SKILL.md` (Claude Code。Stop hook 前提)
 - `codex/skills/yt-loop{,-hook}/SKILL.md` (Codex/Cursor/Antigravity。yt-loop-hook は Codex hook 前提)
 
-**機能を片方に足したら、もう片方へ移植するか「意図的な差分」として AGENTS.md に記録するか、必ずどちらかを行う** (v1.5 で hook 版に brief/anchors の配線漏れが起き、指紋防御が片系統だけ欠落した — この事故の再発防止)。現在の意図的な差分: `yt-loop.js` は Claude/Codex hook 制御プレーンの正本で、hook なし `$yt-loop` / `codex/yt-loop-runner.sh` は従来どおり Bash 互換経路。
+**機能を片方に足したら、もう片方へ移植するか「意図的な差分」として AGENTS.md に記録するか、必ずどちらかを行う** (v1.5 で hook 版に brief/anchors の配線漏れが起き、指紋防御が片系統だけ欠落した — この事故の再発防止)。現在の意図的な差分: `yt-loop.js` は Claude/Codex hook 制御プレーンの正本。`confirm-judges.js` と互換wrapperは `sync-packages.sh` がhookなしスキルにも同期する。hookなし `$yt-loop` / `codex/yt-loop-runner.sh` はループ本体についてはBash互換経路。
 
 ## テストの使い分け
 

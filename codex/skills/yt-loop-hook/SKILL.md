@@ -82,13 +82,12 @@ node "$PLUGIN_ROOT_RESOLVED/scripts/yt-loop.js" state-config "<STATE_FILE>" \
 **確認ジャッジ (judges) の確定**: 合格時の確認採点を誰が担うかを、指紋の記録前に確定します:
 
 ```bash
-bash "$PLUGIN_ROOT_RESOLVED/scripts/confirm-judges.sh" --detect
+node "$PLUGIN_ROOT_RESOLVED/scripts/confirm-judges.js" --configure "<STATE_FILE>" \
+  --selection "<auto またはユーザー指定>" \
+  --host-vendor codex
 ```
 
-- 候補 (fable / codex / grok) のうち**周回採点と同じベンダーを除いたもの**を使う。Codex では codex (= codex CLI) は同ベンダーなので除外し、fable / grok を採用する
-- ユーザーが `judges: host` を指定したら外部を使わない。明示指定 (`judges: host+grok` 等) はそれに従う
-- `node "$PLUGIN_ROOT_RESOLVED/scripts/yt-loop.js" state-config "<STATE_FILE>" --judges "host,fable,grok" --judges-detected "<検出結果をカンマ区切り>"` で記録する (候補ゼロなら `--judges "host"` = 従来動作)
-- **judges は指紋対象** — ループ開始後に構成を変えると pass gate が合格を拒否する
+このコマンドが候補を検出し、`auto` ではOpenAI系を同一ベンダーとして除外し、judges・検出結果・モデル設定をstateへ固定する。Claudeジャッジは既定 `fable`、Grokはモデル一覧から設定済みモデルを解決する。解決不能なら `configured-unpinned` と開示する。必要なら開始前に `YT_JUDGE_CLAUDE_MODEL` / `YT_JUDGE_GROK_MODEL` で上書きする。`auto` の候補ゼロなら `host`。明示指定した不在CLIは構成から消さず、失敗として報告する。**judges とモデル設定は指紋対象**で、開始後の変更は合格拒否になる。
 
 **ブリーフ・アンカー・judges を書き終えてから**、ものさしの指紋を記録します (順序は Stop hook が機械検証する — 生成後に記録した合格は拒否される):
 
@@ -179,13 +178,13 @@ node "$PLUGIN_ROOT_RESOLVED/scripts/yt-loop.js" validate-eval "$EVAL_FILE" "-" "
 
 **score >= threshold の場合のみ、応答を終える前に確認採点を実行する** (Stop hook の pass gate が確認採点の実在・本採点との相違・集計規則 >= threshold を機械検証する — 省略した合格主張は拒否される):
 
-**A. judges に外部ジャッジ (fable/grok 等) がある場合** — 確認採点の席は外部ベンダーが担う:
+**A. judges に外部ジャッジ (claude/grok 等) がある場合** — 確認採点の席は外部ベンダーが担う:
 
 ```bash
-bash "$PLUGIN_ROOT_RESOLVED/scripts/confirm-judges.sh" "<STATE_FILE>"
+node "$PLUGIN_ROOT_RESOLVED/scripts/confirm-judges.js" "<STATE_FILE>"
 ```
 
-- 各外部 CLI が `turn-NNN-eval-confirm-<judge>.json` (+ `.fresh` 証明) または `.failed` を書く。**JSON を手で書いたり編集したりしない** — fresh 証明の無い確認は失敗扱いになる
+- 各外部 CLI が `turn-NNN-eval-confirm-<judge>.json` (+ 内容ハッシュの整合マーカー) または `.failed` を書く。**JSONを手で書いたり編集したりしない**。整合マーカーはローカル一貫性確認であり、ベンダー署名ではない
 - 最終行が `RESULT:OK` なら B は不要。`RESULT:ALL_FAILED` なら B も実行する (降格は最終報告で自動開示)
 - 判定規則は機械側: 外部 1 体 = min / 2 体以上 = 下側中央値 (2/3 合意)。採用スコアは下げる方向にのみ動く
 

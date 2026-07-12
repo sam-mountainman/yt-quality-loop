@@ -37,5 +37,6 @@ jobs:
         shell: pwsh
         run: |
           node --check plugins/yt-quality-loop/scripts/yt-loop.js
+          node --check plugins/yt-quality-loop/scripts/confirm-judges.js
           node --check scripts/e2e-smoke-node.js
           node scripts/e2e-smoke-node.js plugins/yt-quality-loop

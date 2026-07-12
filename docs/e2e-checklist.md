@@ -103,15 +103,17 @@ Cursor CLI には、この repo の plugin marketplace を headless validate す
 - `agents/yt-quality-evaluator.md` が見える
 - 旧 Gemini CLI 互換では `gemini-extension.json` が validate される
 
-## 実測記録 (2026-07-06, codex-cli 0.132.0)
+## Codex実測記録
 
-- `codex plugin add yt-quality-loop@yt-quality-loop`: ✅ (cache 1.4.0, hooks/skills 展開確認)
-- `$yt-loop-hook` を `codex exec` で実走: hook 未発火 (plugin hook / repo hook とも、`--dangerously-bypass-hook-trust` 付きでも) → **スキルが検知して `$yt-loop` に自動フォールバックし、納品まで完走** (85点・自己採点開示付き・動画ブリーフ自動生成)。exec モードで hook は発火しない模様
-- 対話モードの hook 発火: 未検証 (tmux 無し環境)。対話 Codex で `YT_LOOP_SESSION_ID` 注入の有無を確認すること
+- `codex plugin add yt-quality-loop@yt-quality-loop`: v1.7.1で再確認する
+- **過去結果 (2026-07-06, CLI 0.132.0)**: `codex exec` でhook未発火。現行仕様の判定には使わない
+- **現行結果 (2026-07-13, CLI 0.144.1)**: ユーザーStop hookを `codex exec --dangerously-bypass-hook-trust` で実行し、マーカーファイル作成を確認。公式hooks仕様とも一致
+- v1.7.1をローカルマーケットプレイスからinstallし、plugin同梱UserPromptSubmitが実session idをモデルへ注入すること、同じturnでStop hookイベントが実行されることを確認
+- 対話モードのplugin hook信頼フロー: `/hooks` で実機確認すること
 - 公式 docs 確認済み: PLUGIN_ROOT / CLAUDE_PLUGIN_ROOT が plugin hook に渡る、イベント名 PascalCase、decision:block 継続 — 実装は仕様適合
 
-## 実測記録・追補 (2026-07-06, hook発火条件)
+### 過去記録 (0.132.0、参考のみ)
 
 - `codex exec` / 対話TUI (CLI 0.132.0, `--dangerously-bypass-hook-trust` 付き) の両方で、plugin hook・repo hook (`.codex/hooks.json`) とも**発火せず** (dump hook による実測)。プラグインの UserPromptSubmit 注入もコンテキストに届かない (モデルに引用させて NONE を確認)
 - bypass 無しの対話承認フローは未検証 — Codex Desktop アプリが `~/.codex/state_5.sqlite` をロックしており CLI 対話を並走できなかった (Desktop 常用環境では CLI 対話の同時起動不可の点も配布時の注意)
-- ユーザー環境の `[hooks.state]` に trusted_hash 実績があるため、hook 自体はどこかの面 (Desktop/承認フロー) で機能する。`$yt-loop-hook` は plugin root 不在を検知して `$yt-loop` へ安全にフォールバックするため、発火しない環境でも実害なし (実測済み)
+- 本番pluginでは `/hooks` で定義を確認・信頼し、`$yt-loop-hook` の実走でStop継続を確認する。管理ポリシーやhook無効時は `$yt-loop` へフォールバックする

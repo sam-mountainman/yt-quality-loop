@@ -19,6 +19,7 @@ CRITERIA="$(jq -r '.criteria // ""' "$STATE")"
 EVAL_SKILL="$(jq -r '.evaluator_skill // ""' "$STATE")"
 BRIEF_FILE="$(jq -r '.brief_file // ""' "$STATE")"
 ANCHORS_FILE="$(jq -r '.anchors_file // ""' "$STATE")"
+JUDGES_UNAVAILABLE="$(jq -r '.judges_unavailable // ""' "$STATE")"
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 hash_of() { { shasum -a 256 "$1" 2>/dev/null || sha256sum "$1" 2>/dev/null; } | cut -d' ' -f1; }
@@ -34,6 +35,7 @@ echo "- Ended reason: $ENDED_REASON"
 echo "- Threshold: $THRESHOLD"
 [ -n "$BRIEF_FILE" ] && [ "$BRIEF_FILE" != "null" ] && echo "- Brief: $BRIEF_FILE"
 [ -n "$ANCHORS_FILE" ] && [ "$ANCHORS_FILE" != "null" ] && echo "- Anchors: $ANCHORS_FILE (次回同じ軸なら anchors: 指定で再利用可)"
+[ -n "$JUDGES_UNAVAILABLE" ] && [ "$JUDGES_UNAVAILABLE" != "null" ] && echo "- ⚠ ループ開始時に不在だった明示ジャッジ: $JUDGES_UNAVAILABLE"
 
 # --- 報告の裏取り: state の自己申告を信じず、現物と照合してから権威づけする ---
 VERIFY_FAILS=()
@@ -59,7 +61,7 @@ if [[ "$BEST_ITER" =~ ^[0-9]+$ ]]; then
     # 確認採点の実在: 外部ジャッジ (judges) の有効な確認があればそれで足りる。無ければ host フォーク確認を要求
     JUDGES_CONF="$(jq -r '.judges // "host"' "$STATE" 2>/dev/null || echo "host")"
     EXT_CONF_OK=""
-    for _j in fable codex grok; do
+    for _j in claude codex grok; do
       case ",$JUDGES_CONF," in *",$_j,"*) ;; *) continue ;; esac
       CJ="$TURNS_DIR/turn-$V_NNN-eval-confirm-$_j.json"
       MJ="$TURNS_DIR/turn-$V_NNN-eval-confirm-$_j.fresh"
@@ -181,9 +183,14 @@ if [ "$R_JUDGES" != "host" ] || [ -n "$JC_RULE" ]; then
   echo "## 確認採点 (judges)"
   echo ""
   echo "- 構成: $R_JUDGES"
+  JMODELS="$(jq -r '(.judge_models // {}) | to_entries[]? | "- \(.key) model: \(.value // \"configured-unpinned\")"' "$STATE" 2>/dev/null || true)"
+  [ -n "$JMODELS" ] && printf '%s\n' "$JMODELS"
+  if jq -e 'any((.judge_models // {})[]; . == "configured-unpinned")' "$STATE" >/dev/null 2>&1; then
+    echo "- ⚠ configured-unpinned はCLI既定モデルを使ったため、モデルIDを固定・検証できていません"
+  fi
   JD="$(jq -r '.judges_detected // ""' "$STATE" 2>/dev/null || echo "")"
   if [ -n "$JD" ] && [ "$JD" != "null" ]; then
-    for _j in fable codex grok; do
+    for _j in claude codex grok; do
       case ",$JD," in *",$_j,"*)
         case ",$R_JUDGES," in *",$_j,"*) ;; *) echo "- $_j: 検出済みだが不使用 (ユーザー指定)";; esac ;;
       esac
@@ -196,10 +203,11 @@ if [ "$R_JUDGES" != "host" ] || [ -n "$JC_RULE" ]; then
     JC_FAILED="$(jq -r '.judge_confirm.failed // ""' "$STATE" 2>/dev/null || echo "")"
     [ -n "$JC_FAILED" ] && echo "- ⚠ 失敗したジャッジ: $JC_FAILED"
     case "$JC_RULE" in
-      median) echo "- 合格の確からしさ: ★3 (本採点 + 外部2ベンダー以上の下側中央値合意)" ;;
-      min) echo "- 合格の確からしさ: ★2 (本採点 + 外部1ベンダーの min 採用)" ;;
-      host-degraded) echo "- ⚠ 外部ジャッジ全滅のため host フォーク確認に降格 (合格の確からしさ: ★1 = 単独ベンダー相当)" ;;
+      median) echo "- 確認レベル: 3 (本採点 + 外部2ベンダー以上の下側中央値)" ;;
+      min) echo "- 確認レベル: 2 (本採点 + 外部1ベンダーの min 採用)" ;;
+      host-degraded) echo "- ⚠ 外部ジャッジ全滅のため host 確認に降格 (確認レベル: 1)" ;;
     esac
+    echo "- 注: 確認レベルは採点経路の多様性であり、台本品質や再生数の確率ではありません。"
     if [ -n "$JC_EXT" ] && [ "$JC_EXT" != "-" ] && [ "$JC_EXT" != "null" ]; then
       JC_SPREAD="$(printf '%s\n' $JC_EXT | sort -n | awk 'NR==1{min=$1} {max=$1} END{if (NR>0) print max-min; else print 0}')"
       if [[ "$JC_SPREAD" =~ ^[0-9]+$ ]] && [ "$JC_SPREAD" -ge 10 ]; then
