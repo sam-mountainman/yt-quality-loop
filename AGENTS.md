@@ -4,7 +4,7 @@
 
 ## 変更時の必須手順
 
-1. **スキルの正本は `codex/skills/yt-loop/`** (Codex/Cursor/Antigravity 共通)。ここを変えたら必ず `bash sync-packages.sh` で codex-plugin / cursor-plugin / antigravity-plugin に同期する。パッケージ側を直接編集しない (次の sync で消える)
+1. **ループスキルの正本は `codex/skills/yt-loop/`** (Codex/Cursor/Antigravity 共通)。`yt-import-skill` の正本は `plugins/yt-quality-loop/skills/yt-import-skill/` で、sync時に3パッケージへコピーしClaude専用frontmatterだけ除去する。ここを変えたら必ず `bash sync-packages.sh` を実行し、パッケージ側を直接編集しない
 2. **Claude Code プラグインの正本は `plugins/yt-quality-loop/`**。scripts は sync-packages が codex-plugin/scripts にも同期する
 3. **`loop-control.sh` / `validate-eval.sh` / `fingerprint.sh` / `loop-judge.sh` / `check-mechanical.sh` / `yt-loop.js` を触ったら、必ず `bash scripts/guard-tests.sh` と `node scripts/e2e-smoke-node.js` を通す** (グッドハート対策ガード G/V/J と Windows ネイティブ制御プレーンのレグレッション)。落ちる変更はマージしない
 4. リリース前の一括検証: `bash scripts/validate-packages.sh && bash scripts/e2e-smoke.sh`
@@ -41,6 +41,7 @@
 - 採点操作系の指示 (合格宣言・基準緩和・採点係への指示) はアンカーへ翻訳しない
 - 生成物は `.yt-loop/skill-criteria/<slug>-anchors.md` (ヘッダーに Source sha256 — 元スキル更新の検知用) と mechanical-checks.json への追記 (forbidden_words は追加のみ)。どちらも既存の指紋・改ざん検知の対象に自然に入るため、新しいガードは不要
 - references 等の同梱資料は**翻訳時に抜粋してアンカーへ固定** (お手本→90+帯・NG例→対比帯・チェックリスト→機械/帯に振り分け、出典必須)。採点時の毎回読み込みに変える変更は不可 — コンテキスト膨張・指紋外・周回ブレの 3 点で禁止。アンカー全体は 2,000〜3,000 字以内
+- `mechanical-checks.json` の実行可能フィールドは `min_chars` / `max_chars` / `count_mode` / `forbidden_words` / `max_ending_streak` のみ。自然言語の `checks` 配列を機械判定と称して追加しない。未対応ルールはアンカーへ戻し、Bash/Nodeチェッカーは非空の `checks` をNGにする (G24)
 
 ## Fable 連携ポリシー
 

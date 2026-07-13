@@ -19,6 +19,7 @@ set -euo pipefail
 #   G16 evaluator_runtime 改ざん (skill/fable 切替) → PASS CLAIM REJECTED (指紋)
 #   G17-G23 多ベンダー確認採点 (judges): 欠落拒否 / min席替え / median合意 / 全滅降格 /
 #           fail-open封鎖 / judges・model改ざん拒否 / 整合マーカーなし拒否 + CJ1 ランナー成果物
+#   G24 未実装の自然言語 mechanical checks を Bash/Node 両経路で拒否
 #   V1-V4 validate-eval: 加重平均上振れ拒否 / 下方向許容 / 軸過不足拒否 / 短文 feedback 拒否
 #   J1-J4 codex loop-judge: 二重判定ガード / SELF-SCORED 検知 / マーカー有効 / コピペ拒否
 
@@ -378,6 +379,18 @@ write_ext_confirm "$T" 000 grok 91 "$FB1"
 OUT=$(run_hook "$D" g23)
 if has "$(reason_of "$OUT")" "changed mid-loop"; then ok "G23 judge model改ざん → 拒否 (指紋)"; else bad "G23"; fi
 
+# G24: 実行不能な自然言語 checks を「機械チェック済み」として黙って通さない
+echo "本文" > "$TMP/g24-artifact.md"
+jq -n '{checks:[{id:"sentence-count",rule:"5〜10文",how:"文数を数える"}],forbidden_words:[]}' > "$TMP/g24-rules.json"
+G24_SHELL=$(bash "$P/scripts/check-mechanical.sh" "$TMP/g24-artifact.md" "$TMP/g24-rules.json" 2>&1 || true)
+G24_NODE=$(node "$P/scripts/yt-loop.js" check-mechanical "$TMP/g24-artifact.md" "$TMP/g24-rules.json" 2>&1 || true)
+if has "$G24_SHELL" "unsupported mechanical rule field 'checks'" \
+   && has "$G24_NODE" "unsupported mechanical rule field 'checks'"; then
+  ok "G24 未実装mechanical checks → Bash/Node両経路で拒否"
+else
+  bad "G24 (shell=$G24_SHELL / node=$G24_NODE)"
+fi
+
 # CJ1: confirm-judges.js ランナー (stub CLI 注入) — 成功で .json + 整合マーカー、失敗で .failed
 STUB="$TMP/stubbin"; mkdir -p "$STUB"
 cat > "$STUB/grok-ok" <<'STUBEOF'
@@ -441,4 +454,4 @@ if [ "$FAIL" -ne 0 ]; then
   echo "guard-tests: FAILED" >&2
   exit 1
 fi
-  echo "guard-tests: ok (G1-G23, CJ1, V1-V6, J1-J4)"
+  echo "guard-tests: ok (G1-G24, CJ1, V1-V6, J1-J4)"

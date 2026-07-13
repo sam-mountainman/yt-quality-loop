@@ -1,8 +1,6 @@
 ---
 name: yt-import-skill
 description: 既存の台本スキルやプロンプトを読み、yt-quality-loop の generator と channel-profile に移植する。さらに育ったスキルは採点基準 (アンカー + 機械チェック) へ翻訳できる。「既存スキルを使いたい」「台本スキルを移植」「スキルを採点基準にして」「ものさし化」で発動。
-user-invocable: true
-argument-hint: "<既存SKILL.mdやプロンプトファイルのパス> [ものさし化 / 採点基準に翻訳]"
 allowed-tools: "*"
 ---
 

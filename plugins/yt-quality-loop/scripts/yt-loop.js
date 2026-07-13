@@ -304,6 +304,12 @@ function checkMechanicalData(artifact, rulesFile) {
   if (!rules || typeof rules !== "object" || Array.isArray(rules)) {
     return { ok: false, output: `NG: rules file is not valid JSON: ${rulesFile}\n` };
   }
+  if (Object.prototype.hasOwnProperty.call(rules, "checks") && (!Array.isArray(rules.checks) || rules.checks.length > 0)) {
+    return {
+      ok: false,
+      output: "NG: unsupported mechanical rule field 'checks' — use min_chars/max_chars/count_mode/forbidden_words/max_ending_streak, or move the rule to scoring anchors\n",
+    };
+  }
 
   let fail = false;
   const countMode = rules.count_mode === "spoken" ? "spoken" : "raw";

@@ -88,6 +88,24 @@ for (const file of [
     throw new Error(`${file}: missing name/description frontmatter`);
   }
 }
+
+const portableImportSkills = [
+  'codex-plugin/skills/yt-import-skill/SKILL.md',
+  'cursor-plugin/skills/yt-import-skill/SKILL.md',
+  'antigravity-plugin/skills/yt-import-skill/SKILL.md',
+];
+let portableImportBody = null;
+for (const file of portableImportSkills) {
+  if (!fs.existsSync(file)) throw new Error(`${file}: yt-import-skill is not packaged`);
+  const text = fs.readFileSync(file, 'utf8');
+  if (/^(user-invocable|argument-hint):/m.test(text)) {
+    throw new Error(`${file}: contains Claude-only frontmatter`);
+  }
+  if (portableImportBody !== null && text !== portableImportBody) {
+    throw new Error(`${file}: portable yt-import-skill copies are out of sync`);
+  }
+  portableImportBody = text;
+}
 NODE
 
 echo "== claude plugin =="

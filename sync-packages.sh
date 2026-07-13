@@ -6,6 +6,7 @@ set -euo pipefail
 # 正本:
 #   codex/skills/yt-loop/          (Hook を使わない全環境フォールバック)
 #   codex/skills/yt-loop-hook/     (Codex Stop hook 駆動)
+#   plugins/yt-quality-loop/skills/yt-import-skill/ (全環境共通の移植・ものさし化)
 #   agents/                        (Cursor/Antigravity 向け agent 定義)
 #   codex/agents/                  (Codex custom agent 定義)
 #   plugins/yt-quality-loop/scripts (Hook 駆動ループ制御)
@@ -32,6 +33,30 @@ for pkg in codex-plugin cursor-plugin antigravity-plugin; do
   find "$DEST/scripts" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
   echo "synced -> $pkg/skills/yt-loop"
 done
+
+# 既存スキル移植・ものさし化はループ方式に依存しない共通スキル。
+# Claude版を正本としてAgent Skills対応の3パッケージにも同梱する。
+IMPORT_SKILL_SRC="$ROOT/plugins/yt-quality-loop/skills/yt-import-skill"
+if [ -d "$IMPORT_SKILL_SRC" ]; then
+  for pkg in codex-plugin cursor-plugin antigravity-plugin; do
+    DEST="$ROOT/$pkg/skills/yt-import-skill"
+    rm -rf "$DEST"
+    mkdir -p "$DEST"
+    cp -R "$IMPORT_SKILL_SRC"/. "$DEST"/
+    # user-invocable / argument-hint are Claude Code extensions, not portable
+    # Agent Skills frontmatter. Keep the body shared and strip only those keys.
+    node - "$DEST/SKILL.md" <<'NODE'
+const fs = require("fs");
+const file = process.argv[2];
+const text = fs.readFileSync(file, "utf8")
+  .split(/\r?\n/)
+  .filter((line) => !/^(user-invocable|argument-hint):/.test(line))
+  .join("\n");
+fs.writeFileSync(file, text, "utf8");
+NODE
+    echo "synced -> $pkg/skills/yt-import-skill"
+  done
+fi
 
 HOOK_SKILL_SRC="$ROOT/codex/skills/yt-loop-hook"
 if [ -d "$HOOK_SKILL_SRC" ]; then

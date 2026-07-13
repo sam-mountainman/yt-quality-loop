@@ -22,6 +22,8 @@ This document is the source of truth for what this repository assumes about Clau
 | Windows WSL | Supported by design | Use the Bash compatibility path inside Ubuntu/WSL (`jq` required for Bash scripts). |
 | Windows native (PowerShell/cmd) | Supported for the control plane | Hooks, state updates, eval validation, mechanical checks, fingerprinting, final report, and multi-vendor judge execution use Node without Bash/jq. GUI host loading still needs real app verification. |
 
+`yt-import-skill` is packaged for Claude Code, Codex, Cursor, and Antigravity. Its directory creation, source hashing, and JSON validation instructions use Node, so the ものさし化 translation path does not require Bash, `shasum`, or `jq` on native Windows.
+
 ## Optional Fable Integration
 
 | Mode | Expected behavior | Verification status |

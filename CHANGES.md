@@ -13,6 +13,12 @@
 | 対象ユーザー | エンジニア (自分用) | **非エンジニアの YouTube 運営者** |
 | Codex 対応 | evaluator の一部として利用 | **スキル + 無人ランナーとして全面対応** |
 
+## v1.8.2 の修正 (実行不能な機械ルールを黙って通さない)
+
+- v1.8.1の実スキル実走で、`/yt-import-skill ... ものさし化` が自然言語の `checks` 配列を `mechanical-checks.json` に生成できる一方、Bash/Nodeチェッカーはそれを実行せず無視する不整合を検出した
+- 機械ルールとして生成できる形式を、実装済みの `min_chars` / `max_chars` / `count_mode` / `forbidden_words` / `max_ending_streak` に限定した。文数・行形式・正規表現などは採点アンカーへ戻す
+- 非空の `checks` をBash/Node両経路で即NGにし、「JSONがvalidだから機械判定済み」という誤認を防いだ。G24で両経路を回帰テストする
+
 ## v1.7.2 の修正 (Windows `.cmd` ジャッジ起動)
 
 - Windows実機CIで、引用符から始まる `cmd.exe /S /C` コマンドが実行ファイルパスの外側引用符を剥がす問題を検出。`call <CLI.cmd> ...` の引数配列で起動するように修正した

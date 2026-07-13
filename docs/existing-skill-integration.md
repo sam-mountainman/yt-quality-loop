@@ -90,7 +90,7 @@ yt-quality-loop      = 採点・差し戻し・停止判定
 /yt-import-skill path/to/SKILL.md ものさし化
 ```
 
-- 数字ルール → `mechanical-checks.json` (機械○×)
+- 対応済み数字ルール (総文字数・固定禁止語・文末連続) → `mechanical-checks.json` (機械○×)。文数・行形式・正規表現など未対応の条件はアンカーへ戻す
 - 書き方ルール + 価値観 → 意図翻訳した採点アンカー (`.yt-loop/skill-criteria/<slug>-anchors.md`)。字面は「既定の証拠」として帯に残す
 - 動画固有軸 2 本 (ブリーフの約束回収・具体例の鮮度) を必ず確保 — 作る係が同じスキルを使う構成で、ループの磨く勾配を保つため
 

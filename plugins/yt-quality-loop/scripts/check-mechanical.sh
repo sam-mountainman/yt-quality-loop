@@ -26,6 +26,13 @@ if [ ! -f "$RULES" ]; then
 fi
 jq -e . "$RULES" >/dev/null 2>&1 || { echo "NG: rules file is not valid JSON: $RULES"; exit 1; }
 
+# `checks` is not an executable DSL. Older import instructions could create a
+# natural-language checks array that looked valid but was silently ignored.
+if jq -e '(.checks? // []) != []' "$RULES" >/dev/null 2>&1; then
+  echo "NG: unsupported mechanical rule field 'checks' — use min_chars/max_chars/count_mode/forbidden_words/max_ending_streak, or move the rule to scoring anchors"
+  exit 1
+fi
+
 FAIL=0
 
 # --- 文字数 ---
